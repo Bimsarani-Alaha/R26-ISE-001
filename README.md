@@ -107,4 +107,3 @@ Located at `src/app/about/page.tsx`
 - Back to Home navigation button
 - Fully responsive design with dark mode support
 - [Tailwind v4 Upgrade Guide](https://tailwindcss.com/docs/upgrade-guide)
-#test
