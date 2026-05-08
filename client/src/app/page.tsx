@@ -29,6 +29,12 @@ export default function HomePage() {
           >
             Features
           </a>
+          <a
+            href="/cvdMatcher"
+            className="px-6 py-3 bg-black text-white dark:bg-white dark:text-black rounded-lg font-medium hover:opacity-80 transition-opacity"
+          >
+            CVD Matcher
+          </a>
         </div>
       </section>
 
