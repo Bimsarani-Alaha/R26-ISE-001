@@ -177,31 +177,246 @@ def get_hue_category(rgb):
     r, g, b = [x / 255.0 for x in rgb]
     mx, mn  = max(r, g, b), min(r, g, b)
     d       = mx - mn
-    if d < 0.12:
-        return "white" if mx > 0.85 else ("black" if mx < 0.25 else "gray")
+    v       = mx          # value/brightness
+    s       = d / mx if mx > 0 else 0  # saturation
+
+    # ── Neutrals ────────────────────────────────────────────────────────────
+    if s < 0.12:
+        if v > 0.92: return "white"
+        if v > 0.78: return "silver"
+        if v > 0.55: return "gray"
+        if v > 0.30: return "charcoal"
+        return "black"
+
+    # ── Hue angle ───────────────────────────────────────────────────────────
     if   mx == r: h = ((g - b) / d) % 6
     elif mx == g: h = (b - r) / d + 2
     else:         h = (r - g) / d + 4
-    h *= 60
-    if h < 20 or h >= 340: return "red"
-    elif h < 45:  return "orange"
-    elif h < 75:  return "yellow"
-    elif h < 150: return "green"
-    elif h < 195: return "cyan"
-    elif h < 255: return "blue"
-    elif h < 285: return "violet"
-    return "pink"
+    h *= 60  # 0–360
 
+    # ── Browns / Tans (low-saturation warm tones) ────────────────────────
+    if s < 0.40 and 15 <= h <= 45:
+        if v > 0.75: return "beige" if s < 0.25 else "peach"
+        if v > 0.55: return "tan"
+        if v > 0.35: return "brown"
+        return "maroon"
+
+    # Khaki / olive (low-sat yellow-green)
+    if s < 0.45 and 45 <= h <= 80:
+        if v > 0.70: return "khaki"
+        return "olive"
+
+    # Army green (low-sat mid-green)
+    if s < 0.45 and 80 <= h <= 150:
+        return "army"
+
+    # ── Reds (wraps around 0°/360°) ─────────────────────────────────────
+    if h < 10 or h >= 345:
+        if s > 0.75 and v > 0.55: return "red"
+        if v < 0.35: return "maroon"
+        if s < 0.55: return "rose"
+        return "crimson"
+
+    # ── Pink / Coral / Salmon zone ───────────────────────────────────────
+    if 340 <= h < 345 or 10 <= h < 20:
+        if v > 0.85 and s < 0.50: return "blush"
+        if v > 0.70: return "coral" if s > 0.55 else "salmon"
+        return "rust"
+
+    # 20–45° — Orange family
+    if 20 <= h < 45:
+        if v < 0.40: return "brown"
+        if v < 0.60: return "rust" if s > 0.60 else "copper"
+        if s > 0.75: return "orange"
+        return "amber" if v < 0.80 else "peach"
+
+    # 45–65° — Yellow-orange / Gold / Mustard
+    if 45 <= h < 65:
+        if v > 0.80 and s > 0.70: return "yellow"
+        if v > 0.60: return "gold" if s > 0.55 else "mustard"
+        return "olive"
+
+    # 65–80° — Yellow
+    if 65 <= h < 80:
+        if s > 0.50 and v > 0.70: return "yellow"
+        return "olive"
+
+    # 80–110° — Lime / Yellow-green
+    if 80 <= h < 110:
+        if s > 0.55 and v > 0.65: return "lime"
+        return "olive"
+
+    # 110–160° — Green family
+    if 110 <= h < 160:
+        if v > 0.65 and s > 0.55: return "green"
+        if v > 0.80 and s < 0.40: return "mint"
+        if v > 0.50 and s > 0.45: return "emerald"
+        if v < 0.40: return "forest"
+        return "sage"
+
+    # 160–195° — Teal / Cyan
+    if 160 <= h < 195:
+        if s > 0.50 and v > 0.60: return "teal"
+        return "cyan"
+
+    # 195–220° — Cyan / Sky blue
+    if 195 <= h < 220:
+        if v > 0.75: return "sky"
+        return "cyan"
+
+    # 220–250° — Blue family
+    if 220 <= h < 250:
+        if v < 0.30: return "navy"
+        if v < 0.55: return "denim" if s < 0.70 else "cobalt"
+        if s > 0.70: return "royal"
+        return "blue"
+
+    # 250–265° — Periwinkle / Steel blue
+    if 250 <= h < 265:
+        if v > 0.70: return "periwinkle"
+        return "steel"
+
+    # 265–290° — Indigo / Violet
+    if 265 <= h < 290:
+        if v < 0.40: return "indigo"
+        return "violet"
+
+    # 290–310° — Purple / Plum
+    if 290 <= h < 310:
+        if v < 0.45: return "plum"
+        return "purple"
+
+    # 310–325° — Magenta / Fuchsia
+    if 310 <= h < 325:
+        if s > 0.70: return "fuchsia"
+        return "magenta"
+
+    # 325–345° — Pink / Lavender / Mauve
+    if 325 <= h < 345:
+        if v > 0.80 and s < 0.45: return "lavender"
+        if v > 0.70: return "pink" if s > 0.55 else "blush"
+        if v > 0.50: return "hot_pink" if s > 0.70 else "mauve"
+        return "maroon"
+
+    return "gray"  # fallback
+
+
+# ── CVD Colour Confusion Pairs ─────────────────────────────────────────────────
 CVD_CONFUSION = {
-    "Protanopia":   [("red","green"),("red","cyan"),("orange","green"),("red","gray"),("orange","cyan")],
-    "Deuteranopia": [("red","green"),("red","yellow"),("orange","yellow"),("green","yellow"),("orange","green")],
-    "Tritanopia":   [("blue","yellow"),("blue","orange"),("violet","yellow"),("cyan","pink"),("blue","green")],
+    "Protanopia": [
+        # Red-green confusion (no red cone)
+        ("red", "green"), ("red", "cyan"), ("red", "gray"),
+        ("orange", "green"), ("orange", "cyan"), ("orange", "gray"),
+        ("red", "olive"), ("red", "brown"), ("red", "teal"),
+        ("maroon", "green"), ("maroon", "olive"), ("maroon", "teal"),
+        ("coral", "green"), ("coral", "teal"), ("coral", "gray"),
+        ("salmon", "green"), ("salmon", "olive"),
+        ("crimson", "green"), ("crimson", "gray"),
+        ("rose", "green"), ("rose", "teal"),
+        ("magenta", "green"), ("magenta", "cyan"),
+        ("pink", "green"), ("pink", "teal"),
+        ("red", "lime"), ("orange", "lime"),
+    ],
+    "Deuteranopia": [
+        # Red-green confusion (no green cone)
+        ("red", "green"), ("red", "yellow"), ("red", "olive"),
+        ("orange", "yellow"), ("orange", "green"), ("orange", "olive"),
+        ("green", "yellow"), ("green", "brown"), ("green", "gray"),
+        ("lime", "yellow"), ("lime", "orange"),
+        ("olive", "brown"), ("olive", "orange"), ("olive", "yellow"),
+        ("teal", "gray"), ("teal", "blue"), ("teal", "purple"),
+        ("coral", "yellow"), ("coral", "olive"),
+        ("salmon", "yellow"), ("salmon", "green"),
+        ("crimson", "olive"), ("crimson", "brown"),
+        ("maroon", "olive"), ("maroon", "brown"),
+        ("rose", "yellow"), ("rose", "green"),
+        ("magenta", "red"), ("pink", "yellow"),
+    ],
+    "Tritanopia": [
+        # Blue-yellow confusion (no blue cone)
+        ("blue", "yellow"), ("blue", "orange"), ("blue", "green"),
+        ("violet", "yellow"), ("violet", "orange"), ("violet", "red"),
+        ("cyan", "pink"), ("cyan", "gray"), ("cyan", "white"),
+        ("navy", "maroon"), ("navy", "olive"), ("navy", "brown"),
+        ("teal", "yellow"), ("teal", "orange"),
+        ("sky", "yellow"), ("sky", "orange"), ("sky", "pink"),
+        ("indigo", "red"), ("indigo", "orange"),
+        ("purple", "red"), ("purple", "orange"),
+        ("lavender", "pink"), ("lavender", "white"),
+        ("blue", "brown"), ("blue", "olive"),
+        ("periwinkle", "pink"), ("periwinkle", "yellow"),
+    ],
 }
 
+# ── Colour Display Names ────────────────────────────────────────────────────────
 COLOR_NAMES = {
-    "red":"Red","orange":"Orange","yellow":"Yellow","green":"Green",
-    "cyan":"Cyan","blue":"Blue","violet":"Violet","pink":"Pink/Magenta",
-    "white":"White","black":"Black","gray":"Gray/Neutral",
+    # Neutrals
+    "white":      "White",
+    "black":      "Black",
+    "gray":       "Gray",
+    "silver":     "Silver",
+    "charcoal":   "Charcoal",
+    "beige":      "Beige",
+    "cream":      "Cream/Off-White",
+    "ivory":      "Ivory",
+
+    # Reds & Pinks
+    "red":        "Red",
+    "crimson":    "Crimson",
+    "maroon":     "Maroon",
+    "rose":       "Rose",
+    "coral":      "Coral",
+    "salmon":     "Salmon",
+    "pink":       "Pink",
+    "hot_pink":   "Hot Pink",
+    "blush":      "Blush",
+
+    # Oranges & Browns
+    "orange":     "Orange",
+    "amber":      "Amber",
+    "brown":      "Brown",
+    "tan":        "Tan",
+    "khaki":      "Khaki",
+    "rust":       "Rust",
+    "copper":     "Copper",
+    "peach":      "Peach",
+
+    # Yellows
+    "yellow":     "Yellow",
+    "gold":       "Gold",
+    "lime":       "Lime Green",
+    "olive":      "Olive",
+    "mustard":    "Mustard",
+
+    # Greens
+    "green":      "Green",
+    "teal":       "Teal",
+    "emerald":    "Emerald Green",
+    "sage":       "Sage Green",
+    "mint":       "Mint",
+    "forest":     "Forest Green",
+    "army":       "Army Green",
+    "cyan":       "Cyan",
+
+    # Blues
+    "blue":       "Blue",
+    "navy":       "Navy Blue",
+    "sky":        "Sky Blue",
+    "royal":      "Royal Blue",
+    "denim":      "Denim Blue",
+    "cobalt":     "Cobalt Blue",
+    "periwinkle": "Periwinkle",
+    "steel":      "Steel Blue",
+
+    # Purples
+    "purple":     "Purple",
+    "violet":     "Violet",
+    "indigo":     "Indigo",
+    "lavender":   "Lavender",
+    "plum":       "Plum",
+    "mauve":      "Mauve",
+    "magenta":    "Magenta",
+    "fuchsia":    "Fuchsia",
 }
 
 def is_hard_to_distinguish(category, cvd_type):

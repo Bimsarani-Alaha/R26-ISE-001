@@ -22,9 +22,9 @@ const CVD_OPTIONS = ["Normal", "Protanopia", "Deuteranopia", "Tritanopia"];
 
 const CVD_DESCRIPTIONS: Record<string, string> = {
   Normal: "Normal vision",
-  Protanopia: "Protanopia — red-blind",
-  Deuteranopia: "Deuteranopia — green-blind",
-  Tritanopia: "Tritanopia — blue-blind",
+  Protanopia: "Protanopia",
+  Deuteranopia: "Deuteranopia",
+  Tritanopia: "Tritanopia",
 };
 
 const MATCH_BADGE: Record<
