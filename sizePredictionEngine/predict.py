@@ -1,13 +1,13 @@
 from ultralytics import YOLO
 import cv2
-import numpy as np
+import numpy as np #mathematical calculations.
 
-model_path = "sizeEnginev5.0.pt"
-image_path = "077423.jpg"
+model_path = "Y26sizeEnginev6.0.pt"
+image_path = "buddila.jpeg"
 
 model = YOLO(model_path)
 
-result = model(image_path, conf=0.8)[0]
+result = model(image_path, conf=0.8)[0]#run pose detection
 
 # Draw detections
 annotated_img = result.plot()
@@ -48,6 +48,7 @@ if result.keypoints is not None:
         shoulder_ratio = shoulder_width / height if height != 0 else 0
         hip_ratio = hip_width / height if height != 0 else 0
 
+    #show result in outside
         print("\n--- Measurements ---")
         print("Shoulder (px):", shoulder_width)
         print("Hip (px):", hip_width)
@@ -87,8 +88,8 @@ if result.keypoints is not None:
 
         
 
-cv2.imshow("Pose Detection", annotated_img)
+cv2.imshow("Pose Detection", annotated_img)#opens in window
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
-cv2.imwrite("output.jpg", annotated_img)
+cv2.imwrite("output.jpg", annotated_img) #sv output img

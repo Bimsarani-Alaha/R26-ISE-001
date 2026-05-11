@@ -1,71 +1,123 @@
-import type { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Home",
-  description: "Welcome to our application",
-};
+import { useState } from "react"; // React state management
 
 export default function HomePage() {
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Hero Section */}
-      <section className="flex-1 flex flex-col items-center justify-center py-20 px-6 text-center bg-gradient-to-b from-white to-zinc-50 dark:from-black dark:to-zinc-900">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-black dark:text-white mb-6">
-          Welcome to Our App
-        </h1>
-        <p className="text-lg sm:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mb-10">
-          A modern web application built with Next.js, React, and Tailwind CSS
-        </p>
-        <div className="flex gap-4">
-          <a
-            href="/about"
-            className="px-6 py-3 bg-black text-white dark:bg-white dark:text-black rounded-lg font-medium hover:opacity-80 transition-opacity"
-          >
-            Learn More
-          </a>
-          <a
-            href="#features"
-            className="px-6 py-3 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            Features
-          </a>
-        </div>
-      </section>
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+  const [resultImage, setResultImage] = useState<string>("");
+  const [measurements, setMeasurements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string>("");
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-6 bg-white dark:bg-zinc-950">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-center text-black dark:text-white mb-12">
-            Features
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="p-6 rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-2">
-                Fast Performance
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Built with Next.js for optimal speed and performance
-              </p>
-            </div>
-            <div className="p-6 rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-2">
-                Responsive Design
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Looks great on all devices with Tailwind CSS
-              </p>
-            </div>
-            <div className="p-6 rounded-lg border border-zinc-200 dark:border-zinc-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-2">
-                TypeScript
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Type-safe code with full TypeScript support
-              </p>
-            </div>
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { //Runs when user selects an image
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+    setResultImage("");  //Reset Previous Results
+    setMeasurements([]);
+    setMessage("");
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage("Please select an image before predicting.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`); //check API response
+      }
+
+      const data = await res.json();
+
+      setResultImage(data.annotated_image); //Set Annotated Image
+      setMeasurements(data.measurements || []);
+      if (!data.measurements || data.measurements.length === 0) {
+        setMessage("Prediction completed but no measurement data was returned.");
+      }
+    } catch (err) { //error handling for network issues or server errors
+      console.error(err);
+      setMessage("Error connecting to server. Make sure the backend is running.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="page-shell">
+      <section className="card">
+        <div className="hero">
+          <div>
+            <h1>Pose Detection Demo</h1>
+            <p>Upload an image to predict pose measurements and view the annotated result.</p>
+          </div>
+          <div className="actions">
+            <label className="file-input-label">
+              <span>Select Image</span>
+              <input type="file" accept="image/*" onChange={handleChange} />
+            </label>
+            {file && <div className="file-name">{file.name}</div>}
+            <button className="predict-button" onClick={handleUpload} disabled={loading}> 
+              {loading ? "Processing..." : "Predict Image"}
+            </button>
           </div>
         </div>
+
+        {message && <div className="info-box">{message}</div>}
       </section>
-    </div>
+
+      <section className="results">
+        {(preview || resultImage) && (
+          <div className="image-grid">
+            {preview && (
+              <div className="image-card">
+                <h3>Original</h3>
+                <img src={preview} alt="Original upload preview" />
+              </div>
+            )}
+            {resultImage && (
+              <div className="image-card">
+                <h3>Result</h3>
+                <img src={resultImage} alt="Annotated result" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {measurements.length > 0 && (
+          <div className="measurements-card">
+            <h3>Measurements</h3>
+            {measurements.map((m, i) => (
+              <div className="measurement-row" key={i}>
+                <div>
+                  <strong>Shoulder:</strong> {m.shoulder_width?.toFixed(1) ?? "N/A"}
+                </div>
+                <div>
+                  <strong>Hip:</strong> {m.hip_width?.toFixed(1) ?? "N/A"}
+                </div>
+                <div>
+                  <strong>Height:</strong> {m.height?.toFixed(1) ?? "N/A"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
