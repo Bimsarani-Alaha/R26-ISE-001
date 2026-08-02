@@ -1,5 +1,5 @@
-import os
-from xml.dom import minidom
+import os # For file handling
+from xml.dom import minidom # For XML annotations
 
 # CONFIG
 EXPECTED_KPTS = 17
@@ -7,9 +7,9 @@ out_dir = './out'
 
 if not os.path.exists(out_dir):
 
-    os.makedirs(out_dir)
+    os.makedirs(out_dir)#output directory for labels save
 
-file = minidom.parse('Anno150.xml')
+file = minidom.parse('Anno171.xml')
 images = file.getElementsByTagName('image')
 
 for image in images:
@@ -21,6 +21,7 @@ for image in images:
     elem = image.getElementsByTagName('points')
     bbox = image.getElementsByTagName('box')[0]
 
+    #top left and bottom right 
     xtl = float(bbox.getAttribute('xtl'))
     ytl = float(bbox.getAttribute('ytl'))
     xbr = float(bbox.getAttribute('xbr'))
@@ -35,7 +36,7 @@ for image in images:
 
         for e in elem:
 
-            # ✅ Write class + bbox
+            # ✅ Bounding box normalizations
             label_file.write(
                 f"0 {(xtl + w/2)/width} {(ytl + h/2)/height} {w/width} {h/height} "
             )
@@ -43,7 +44,7 @@ for image in images:
             # ✅ Read points safely
             raw_points = e.getAttribute('points').strip()
 
-            if raw_points == "":
+            if raw_points == "": #Handle Empty Keypoints
                 points = []
             else:
                 points = [p for p in raw_points.split(';') if p.strip() != ""]
