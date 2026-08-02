@@ -1,229 +1,247 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
-import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
-import { Button } from "@/app/components/ui/button";
+import { useState } from "react";
+import Link from "next/link";
 
 export default function HomePage() {
-  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+  const [resultImage, setResultImage] = useState<string>("");
+  const [measurements, setMeasurements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string>("");
+  const [height, setHeight] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+    setResultImage("");
+    setMeasurements([]);
+    setMessage("");
+    setHeight("");
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage("Please select an image before predicting.");
+      return;
+    }
+
+    if (!height) {
+      setMessage("Please enter your height in centimeters.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("height", height);
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      setResultImage(data.annotated_image);
+      setMeasurements(data.measurements || []);
+
+      if (!data.measurements || data.measurements.length === 0) {
+        setMessage(
+          "Prediction completed but no measurement data was returned.",
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage(
+        "Error connecting to server. Make sure the backend is running.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-8 md:px-16 py-6 border-b border-[#e8e8e8]">
-        <div className="flex items-center gap-8">
-          {["WOMEN", "MEN", "OCCASION"].map((item) => (
-            <button
-              key={item}
-              type="button"
-              className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
-              style={{ ...SANS, fontWeight: 400 }}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="text-center">
-          <StyleAiWordmark className="text-2xl" />
-        </div>
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={() => router.push("/input")}
-            className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
-            style={{ ...SANS, fontWeight: 400 }}
-          >
-            SKIP
-          </button>
-          <Button
-            onClick={() => router.push("/input")}
-            variant="ghost"
-            size="sm"
-            className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors h-auto p-0 rounded-none bg-transparent hover:bg-transparent"
-            style={{ ...SANS, fontWeight: 400 }}
-          >
-            LOGIN
-          </Button>
-          <Button
-            onClick={() => router.push("/size")}
-            variant="outline"
-            size="sm"
-            className="text-[#111] text-xs tracking-[0.15em] rounded-none border-[#111] hover:bg-[#111] hover:text-white transition-colors h-auto py-1.5 px-4"
-            style={{ ...SANS, fontWeight: 400 }}
-          >
-            POSE DETECTION
-          </Button>
-        </div>
-      </nav>
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
+      <section className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/20 backdrop-blur">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                Pose Detection Demo
+              </h1>
+              <p className="mt-3 text-sm text-slate-300 sm:text-base">
+                Upload an image, enter your height, and predict pose
+                measurements.
+              </p>
+            </div>
 
-      {/* Hero */}
-      <div className="relative flex-1 overflow-hidden">
-        <motion.div
-          initial={{ scale: 1.04, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-          className="w-full h-[82vh] relative"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1659522761084-79196b64abe4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1800"
-            alt="Fashion hero"
-            className="w-full h-full object-cover object-top"
-          />
-          {/* Subtle overlay */}
-          <div className="absolute inset-0 bg-black/10" />
-
-          {/* Hero text overlay */}
-          <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 px-6 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.9, delay: 0.4 }}
-              className="text-white text-4xl md:text-6xl lg:text-7xl mb-8 tracking-wider"
-              style={{ ...SERIF, fontWeight: 300 }}
-            >
-              LOOKS YOU REMEMBER
-            </motion.h1>
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.7 }}
-                onClick={() => router.push("/input")}
-                className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-[#111] px-7 py-3 text-xs tracking-[0.2em] hover:bg-white transition-all duration-300"
-                style={{ ...SANS, fontWeight: 400 }}
-              >
-                START NOW
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </motion.button>
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.8 }}
-                onClick={() => router.push("/size")}
-                className="flex items-center gap-2 border border-white/80 text-white px-7 py-3 text-xs tracking-[0.2em] hover:bg-white hover:text-[#111] transition-all duration-300"
-                style={{ ...SANS, fontWeight: 400 }}
-              >
-                POSE DETECTION
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </motion.button>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/about">
+                <button className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700">
+                  About
+                </button>
+              </Link>
             </div>
           </div>
-        </motion.div>
-      </div>
 
-      {/* Feature strip */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.9 }}
-        className="border-t border-[#e8e8e8]"
-      >
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
-          {[
-            { icon: "◯", label: "AI OUTFIT CURATION" },
-            { icon: "◈", label: "OCCASION MATCHING" },
-            { icon: "◻", label: "STYLE INTELLIGENCE" },
-            { icon: "⊹", label: "PERSONALIZED PICKS" },
-          ].map((feat) => (
-            <div
-              key={feat.label}
-              className="flex flex-col items-center gap-3 py-8 px-6 hover:bg-[#fafafa] transition-colors cursor-default"
-            >
-              <span className="text-lg text-[#999]">{feat.icon}</span>
-              <span
-                className="text-[10px] tracking-[0.2em] text-[#555]"
-                style={{ ...SANS, fontWeight: 400 }}
+          <div className="mt-6 grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center transition hover:border-sky-400 hover:bg-slate-800/80">
+                <span className="text-sm font-medium text-slate-200">
+                  Select Image
+                </span>
+                <span className="mt-2 text-xs text-slate-400">
+                  PNG, JPG, WEBP, and more
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleChange}
+                  className="hidden"
+                />
+              </label>
+
+              {file && (
+                <div className="text-sm text-slate-400">{file.name}</div>
+              )}
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="height"
+                  className="text-sm font-medium text-slate-200"
+                >
+                  Height (cm)
+                </label>
+                <input
+                  id="height"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  placeholder="e.g. 172.5"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none ring-0 focus:border-sky-500"
+                />
+              </div>
+
+              <button
+                className="w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleUpload}
+                disabled={loading}
               >
-                {feat.label}
-              </span>
+                {loading ? "Processing..." : "Predict Image"}
+              </button>
             </div>
-          ))}
-        </div>
-      </motion.div>
 
-      {/* Membership-style section */}
-      <div className="px-8 md:px-16 py-16 bg-[#fafafa] border-t border-[#e8e8e8]">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 1 }}
-          className="text-center text-2xl md:text-3xl tracking-[0.25em] text-[#111] mb-12"
-          style={{ ...SERIF, fontWeight: 400 }}
-        >
-          HOW IT WORKS
-        </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 max-w-3xl mx-auto border border-[#e5e5e5]">
-          {[
-            {
-              step: "01",
-              title: "DESCRIBE",
-              desc: "Tell us your occasion, style, and preferences in your own words.",
-            },
-            {
-              step: "02",
-              title: "ANALYSE",
-              desc: "Our AI reads your needs and matches them to curated outfit options.",
-            },
-            {
-              step: "03",
-              title: "DISCOVER",
-              desc: "Browse personalized recommendations crafted just for you.",
-            },
-          ].map((item, i) => (
-            <motion.div
-              key={item.step}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1.1 + i * 0.1 }}
-              className={`flex flex-col items-center text-center p-10 ${
-                i < 2
-                  ? "border-b md:border-b-0 md:border-r border-[#e5e5e5]"
-                  : ""
-              } bg-white`}
-            >
-              <span
-                className="text-[11px] tracking-[0.25em] text-[#aaa] mb-4"
-                style={SANS}
-              >
-                {item.step}
-              </span>
-              <span
-                className="text-base tracking-[0.2em] text-[#111] mb-3"
-                style={{ ...SERIF, fontWeight: 500 }}
-              >
-                {item.title}
-              </span>
-              <p
-                className="text-xs text-[#888] leading-relaxed"
-                style={{ ...SANS, fontWeight: 300 }}
-              >
-                {item.desc}
-              </p>
-            </motion.div>
-          ))}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+              <h2 className="text-base font-semibold text-white">
+                How it works
+              </h2>
+              <ul className="mt-3 space-y-2 leading-6">
+                <li>• Upload a full-body image.</li>
+                <li>• Enter your real height for better scaling.</li>
+                <li>• Review the annotated image and measurements.</li>
+              </ul>
+            </div>
+          </div>
+
+          {message && (
+            <div className="mt-4 rounded-xl border border-sky-700/40 bg-sky-950/30 px-4 py-3 text-sm text-sky-200">
+              {message}
+            </div>
+          )}
         </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.4 }}
-          className="flex justify-center mt-10"
-        >
-          <Button
-            onClick={() => router.push("/input")}
-            variant="outline"
-            className="flex items-center gap-2 border border-[#111] text-[#111] px-8 py-3 text-xs tracking-[0.2em] rounded-none h-auto bg-transparent hover:bg-[#111] hover:text-white transition-all duration-300"
-            style={{ ...SANS, fontWeight: 400 }}
-          >
-            GET STARTED
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Button>
-        </motion.div>
-      </div>
-    </div>
+        <section className="space-y-4">
+          {(preview || resultImage) && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {preview && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-white">
+                    Original
+                  </h3>
+                  <img
+                    src={preview}
+                    alt="Original upload preview"
+                    className="h-auto w-full rounded-xl object-contain"
+                  />
+                </div>
+              )}
+
+              {resultImage && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-white">
+                    Result
+                  </h3>
+                  <img
+                    src={resultImage}
+                    alt="Annotated result"
+                    className="h-auto w-full rounded-xl object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {measurements.length > 0 && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+              <h3 className="mb-4 text-lg font-semibold text-white">
+                Measurements
+              </h3>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {measurements.map((m, i) => (
+                  <div
+                    className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"
+                    key={i}
+                  >
+                    <div className="text-sm text-slate-400">Shoulder (px)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.shoulder_width?.toFixed(1) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">Hip (px)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.hip_width?.toFixed(1) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">
+                      Height (px)
+                    </div>
+                    <div className="text-base font-semibold text-white">
+                      {m.height?.toFixed(1) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">
+                      Shoulder (cm)
+                    </div>
+                    <div className="text-base font-semibold text-white">
+                      {m.shoulder_cm?.toFixed(2) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">Hip (cm)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.hip_cm?.toFixed(2) ?? "N/A"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
   );
 }

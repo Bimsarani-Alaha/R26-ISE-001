@@ -1,24 +1,13 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { SiteNav } from "@/app/components/SiteNav";
-import { SANS, SERIF } from "@/app/components/typography";
+import Link from "next/link";
 
-interface Measurement {
-  shoulder_width?: number;
-  hip_width?: number;
-  height?: number;
-  shoulder_cm?: number;
-  hip_cm?: number;
-}
-
-export default function SizePage() {
+export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [measurements, setMeasurements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [height, setHeight] = useState("");
@@ -29,15 +18,6 @@ export default function SizePage() {
 
     setFile(f);
     setPreview(URL.createObjectURL(f));
-    setResultImage("");
-    setMeasurements([]);
-    setMessage("");
-    setHeight("");
-  };
-
-  const handleReset = () => {
-    setFile(null);
-    setPreview("");
     setResultImage("");
     setMeasurements([]);
     setMessage("");
@@ -92,253 +72,176 @@ export default function SizePage() {
     }
   };
 
-  const isValid = Boolean(file) && height.trim().length > 0;
-
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col">
-      <SiteNav backHref="/" />
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
+      <section className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/20 backdrop-blur">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                Pose Detection Demo
+              </h1>
+              <p className="mt-3 text-sm text-slate-300 sm:text-base">
+                Upload an image, enter your height, and predict pose
+                measurements.
+              </p>
+            </div>
 
-      {/* Content */}
-      <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-14">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-12 text-center"
-        >
-          <p className="text-xs tracking-[0.3em] text-[#aaa] mb-4" style={SANS}>
-            POSE DETECTION
-          </p>
-          <h1
-            className="text-4xl md:text-5xl text-[#111] tracking-wide mb-4"
-            style={{ ...SERIF, fontWeight: 300 }}
-          >
-            Measure Your Fit
-          </h1>
-          <p className="text-sm text-[#888] tracking-wide" style={SANS}>
-            Upload a full-body photo and enter your height — our AI predicts
-            pose measurements instantly.
-          </p>
-        </motion.div>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/about">
+                <button className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700">
+                  About
+                </button>
+              </Link>
+            </div>
+          </div>
 
-        {/* Upload panel */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
-          className="border border-[#e8e8e8] p-8 md:p-10 mb-8"
-        >
-          <p
-            className="block text-[10px] tracking-[0.25em] text-[#aaa] mb-4"
-            style={SANS}
-          >
-            UPLOAD A FULL-BODY PHOTO
-          </p>
-
-          <label
-            className={`flex flex-col items-center justify-center border border-dashed px-6 py-10 text-center cursor-pointer transition-all duration-200 mb-6 ${
-              file
-                ? "border-[#111] bg-[#fafafa]"
-                : "border-[#ddd] hover:border-[#999] hover:bg-[#fafafa]"
-            }`}
-            style={SANS}
-          >
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleChange}
-              className="hidden"
-            />
-            {file ? (
-              <span className="text-xs text-[#555] break-all px-2">
-                {file.name}
-              </span>
-            ) : (
-              <>
-                <span className="text-2xl text-[#ccc] mb-2">⊹</span>
-                <span className="text-xs tracking-[0.15em] text-[#888]">
-                  CLICK TO SELECT
+          <div className="mt-6 grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center transition hover:border-sky-400 hover:bg-slate-800/80">
+                <span className="text-sm font-medium text-slate-200">
+                  Select Image
                 </span>
-              </>
-            )}
-          </label>
+                <span className="mt-2 text-xs text-slate-400">
+                  PNG, JPG, WEBP, and more
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleChange}
+                  className="hidden"
+                />
+              </label>
 
-          {file && (
-            <div className="flex justify-end -mt-4 mb-6">
+              {file && (
+                <div className="text-sm text-slate-400">{file.name}</div>
+              )}
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="height"
+                  className="text-sm font-medium text-slate-200"
+                >
+                  Height (cm)
+                </label>
+                <input
+                  id="height"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  placeholder="e.g. 172.5"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none ring-0 focus:border-sky-500"
+                />
+              </div>
+
               <button
-                type="button"
-                onClick={handleReset}
-                className="text-[10px] tracking-[0.15em] text-[#888] hover:text-[#111] underline underline-offset-2 transition-colors"
-                style={SANS}
+                className="w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleUpload}
+                disabled={loading}
               >
-                RESET
+                {loading ? "Processing..." : "Predict Image"}
               </button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+              <h2 className="text-base font-semibold text-white">
+                How it works
+              </h2>
+              <ul className="mt-3 space-y-2 leading-6">
+                <li>• Upload a full-body image.</li>
+                <li>• Enter your real height for better scaling.</li>
+                <li>• Review the annotated image and measurements.</li>
+              </ul>
+            </div>
+          </div>
+
+          {message && (
+            <div className="mt-4 rounded-xl border border-sky-700/40 bg-sky-950/30 px-4 py-3 text-sm text-sky-200">
+              {message}
+            </div>
+          )}
+        </div>
+
+        <section className="space-y-4">
+          {(preview || resultImage) && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {preview && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-white">
+                    Original
+                  </h3>
+                  <img
+                    src={preview}
+                    alt="Original upload preview"
+                    className="h-auto w-full rounded-xl object-contain"
+                  />
+                </div>
+              )}
+
+              {resultImage && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <h3 className="mb-3 text-lg font-semibold text-white">
+                    Result
+                  </h3>
+                  <img
+                    src={resultImage}
+                    alt="Annotated result"
+                    className="h-auto w-full rounded-xl object-contain"
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          <div className="mb-6">
-            <label
-              htmlFor="height"
-              className="block text-[10px] tracking-[0.25em] text-[#aaa] mb-3"
-              style={SANS}
-            >
-              HEIGHT (CM)
-            </label>
-            <input
-              id="height"
-              type="number"
-              min="1"
-              step="0.1"
-              placeholder="e.g. 172.5"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
-              className="w-full bg-transparent text-[#111] placeholder-[#ccc] border-b border-[#ddd] focus:border-[#111] px-1 py-2 text-sm outline-none transition-colors duration-200"
-              style={SANS}
-            />
-          </div>
+          {measurements.length > 0 && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+              <h3 className="mb-4 text-lg font-semibold text-white">
+                Measurements
+              </h3>
 
-          <button
-            type="button"
-            onClick={handleUpload}
-            disabled={!isValid || loading}
-            className={`w-full py-4 text-xs tracking-[0.25em] flex items-center justify-center gap-3 transition-all duration-300 ${
-              isValid && !loading
-                ? "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
-                : "bg-[#f0f0f0] text-[#ccc] cursor-not-allowed"
-            }`}
-            style={SANS}
-          >
-            {loading ? (
-              <>
-                <span className="w-3.5 h-3.5 border border-[#999] border-t-transparent rounded-full animate-spin" />
-                PROCESSING…
-              </>
-            ) : (
-              <>
-                PREDICT IMAGE
-                <ArrowUpRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-
-          {message && (
-            <p className="mt-4 text-xs text-[#666] tracking-wide" style={SANS}>
-              {message}
-            </p>
-          )}
-        </motion.div>
-
-        {/* Results */}
-        <AnimatePresence>
-          {(preview || resultImage || measurements.length > 0) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              transition={{ duration: 0.5 }}
-            >
-              <h2
-                className="text-2xl text-[#111] tracking-wide mb-6"
-                style={{ ...SERIF, fontWeight: 300 }}
-              >
-                Results
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {preview && (
-                  <div>
-                    <p
-                      className="text-[10px] tracking-[0.2em] text-[#aaa] mb-3"
-                      style={SANS}
-                    >
-                      ORIGINAL
-                    </p>
-                    <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f5] border border-[#e8e8e8]">
-                      <img
-                        src={preview}
-                        alt="Original upload preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {resultImage && (
-                  <div>
-                    <p
-                      className="text-[10px] tracking-[0.2em] text-[#aaa] mb-3"
-                      style={SANS}
-                    >
-                      RESULT
-                    </p>
-                    <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f5] border border-[#e8e8e8]">
-                      <img
-                        src={resultImage}
-                        alt="Annotated result"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {measurements.length > 0 && (
-                <div className="border border-[#e8e8e8]">
-                  <p
-                    className="text-[10px] tracking-[0.25em] text-[#aaa] px-5 pt-5 pb-3"
-                    style={SANS}
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {measurements.map((m, i) => (
+                  <div
+                    className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"
+                    key={i}
                   >
-                    MEASUREMENTS
-                  </p>
-                  {measurements.map((m, i) => (
-                    <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: backend rows have no stable id
-                      key={i}
-                      className="border-t border-[#e8e8e8] grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]"
-                    >
-                      {[
-                        {
-                          label: "SHOULDER (PX)",
-                          value: m.shoulder_width?.toFixed(1) ?? "N/A",
-                        },
-                        {
-                          label: "HIP (PX)",
-                          value: m.hip_width?.toFixed(1) ?? "N/A",
-                        },
-                        {
-                          label: "HEIGHT (PX)",
-                          value: m.height?.toFixed(1) ?? "N/A",
-                        },
-                        {
-                          label: "SHOULDER (CM)",
-                          value: m.shoulder_cm?.toFixed(2) ?? "N/A",
-                        },
-                        {
-                          label: "HIP (CM)",
-                          value: m.hip_cm?.toFixed(2) ?? "N/A",
-                        },
-                      ].map((cell) => (
-                        <div key={cell.label} className="p-4">
-                          <p
-                            className="text-[9px] tracking-[0.2em] text-[#aaa] mb-1.5"
-                            style={SANS}
-                          >
-                            {cell.label}
-                          </p>
-                          <p className="text-sm text-[#555]" style={SANS}>
-                            {cell.value}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="text-sm text-slate-400">Shoulder (px)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.shoulder_width?.toFixed(1) ?? "N/A"}
                     </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
+
+                    <div className="mt-2 text-sm text-slate-400">Hip (px)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.hip_width?.toFixed(1) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">
+                      Height (px)
+                    </div>
+                    <div className="text-base font-semibold text-white">
+                      {m.height?.toFixed(1) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">
+                      Shoulder (cm)
+                    </div>
+                    <div className="text-base font-semibold text-white">
+                      {m.shoulder_cm?.toFixed(2) ?? "N/A"}
+                    </div>
+
+                    <div className="mt-2 text-sm text-slate-400">Hip (cm)</div>
+                    <div className="text-base font-semibold text-white">
+                      {m.hip_cm?.toFixed(2) ?? "N/A"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </AnimatePresence>
-      </div>
-    </div>
+        </section>
+      </section>
+    </main>
   );
 }
