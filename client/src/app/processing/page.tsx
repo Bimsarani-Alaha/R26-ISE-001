@@ -3,14 +3,13 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { SiteNav } from "@/app/components/SiteNav";
+import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
 import { Card } from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
 import { useAppStore } from "@/app/context/AppStoreContext";
 import { fetchRecommendations } from "@/app/lib/recommendationApi";
-
-const SERIF = { fontFamily: "'Cormorant Garamond', serif" };
-const SANS = { fontFamily: "'Inter', sans-serif" };
 
 const PROCESSING_STEPS = [
   "Reading your outfit requirements…",
@@ -29,14 +28,14 @@ const FASHION_TIPS = [
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const store = useAppStore();
+  const { requirements, setPrediction, setRecommendations } = useAppStore();
   const [stepIndex, setStepIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!store.requirements) {
+    if (!requirements) {
       router.replace("/input");
       return;
     }
@@ -63,14 +62,14 @@ export default function ProcessingPage() {
     const runPrediction = async () => {
       try {
         setError("");
-        const result = await fetchRecommendations(store.requirements);
+        const result = await fetchRecommendations(requirements);
 
         if (cancelled) {
           return;
         }
 
-        store.setPrediction(result.prediction);
-        store.setRecommendations(result.recommendations);
+        setPrediction(result.prediction);
+        setRecommendations(result.recommendations);
         setStepIndex(PROCESSING_STEPS.length - 1);
         setProgress(100);
         redirectTimer = setTimeout(() => router.replace("/results"), 500);
@@ -99,19 +98,11 @@ export default function ProcessingPage() {
         clearTimeout(redirectTimer);
       }
     };
-  }, [router, store]);
+  }, [router, requirements, setPrediction, setRecommendations]);
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-center px-8 py-6 border-b border-[#e8e8e8]">
-        <span
-          className="text-xl tracking-widest text-[#111]"
-          style={{ ...SERIF, fontWeight: 300, letterSpacing: "0.3em" }}
-        >
-          STYLE AI
-        </span>
-      </nav>
+      <SiteNav centered />
 
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">

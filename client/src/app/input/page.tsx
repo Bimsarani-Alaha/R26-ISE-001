@@ -1,16 +1,15 @@
 "use client";
 
-import { ArrowLeft, ArrowUpRight, Palette, Shirt, User } from "lucide-react";
+import { ArrowUpRight, Palette, Shirt, User } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SiteNav } from "@/app/components/SiteNav";
+import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Textarea } from "@/app/components/ui/textarea";
 import { useAppStore } from "@/app/context/AppStoreContext";
-
-const SERIF = { fontFamily: "'Cormorant Garamond', serif" };
-const SANS = { fontFamily: "'Inter', sans-serif" };
 
 const OCCASIONS = [
   "Casual",
@@ -93,25 +92,7 @@ export default function InputPage() {
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-8 md:px-16 py-6 border-b border-[#e8e8e8]">
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="flex items-center gap-2 text-[#888] hover:text-[#111] transition-colors"
-          style={SANS}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-xs tracking-[0.1em]">BACK</span>
-        </button>
-        <span
-          className="text-xl tracking-widest text-[#111]"
-          style={{ ...SERIF, fontWeight: 300, letterSpacing: "0.3em" }}
-        >
-          STYLE AI
-        </span>
-        <div className="w-16" />
-      </nav>
+      <SiteNav backHref="/" />
 
       {/* Content */}
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-14">
