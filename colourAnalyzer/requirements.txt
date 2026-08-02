@@ -1,0 +1,12 @@
+
+tensorflow==2.20.0
+numpy>=1.26.0,<2.1
+opencv-python==4.13.0.92
+scikit-learn>=1.4
+pandas>=2.2
+Pillow>=10.0
+Flask>=3.0
+Flask-Cors>=4.0
+Werkzeug>=3.0
+requests>=2.31
+ 
