@@ -61,6 +61,18 @@ npm run build
 npm run start
 ```
 
+### Python Model Server
+
+From the `sizePredictionEngine` folder, install the dependencies and start the FastAPI server:
+
+```bash
+cd sizePredictionEngine
+python -m pip install -r requirements.txt
+python server.py
+```
+
+Then open the client app and upload an image at [http://localhost:3000](http://localhost:3000).
+
 ### Lint Code
 
 ```bash
