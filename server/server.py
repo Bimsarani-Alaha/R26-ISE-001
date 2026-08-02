@@ -18,7 +18,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "SizePredictionEngine/Y26sizeEnginev6.0.pt")
+def resolve_model_path(base_dir: str | None = None) -> str:
+    base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))
+
+    candidates = [
+        os.path.join(base_dir, "sizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "SizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "server", "sizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "server", "SizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+    ]
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    return candidates[0]
+
+
+MODEL_PATH = resolve_model_path()
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+
 model = YOLO(MODEL_PATH)
 
 
