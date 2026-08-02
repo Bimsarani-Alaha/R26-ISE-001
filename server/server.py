@@ -2,7 +2,7 @@ import base64
 import os
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 
@@ -18,7 +18,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "Y26sizeEnginev6.0.pt")
+def resolve_model_path(base_dir: str | None = None) -> str:
+    base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))
+
+    candidates = [
+        os.path.join(base_dir, "sizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "SizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "server", "sizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+        os.path.join(base_dir, "server", "SizePredictionEngine", "Y26sizeEnginev6.0.pt"),
+    ]
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    return candidates[0]
+
+
+MODEL_PATH = resolve_model_path()
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+
 model = YOLO(MODEL_PATH)
 
 
@@ -30,7 +50,7 @@ def read_image_bytes(data: bytes) -> np.ndarray:
     return image
 
 
-def build_measurements(keypoints_array: np.ndarray) -> list[dict]:
+def build_measurements(keypoints_array: np.ndarray, real_height: float) -> list[dict]:
     measurements = []
 
     for person in keypoints_array:
@@ -51,12 +71,25 @@ def build_measurements(keypoints_array: np.ndarray) -> list[dict]:
 
         shoulder_width = get_distance(left_shoulder, right_shoulder)
         hip_width = get_distance(left_hip, right_hip)
+
         eye_mid = (left_eye + right_eye) / 2
         foot_mid = (left_ankle + right_ankle) / 2
+
         height = get_distance(eye_mid, foot_mid)
 
         shoulder_ratio = shoulder_width / height if height != 0 else 0.0
         hip_ratio = hip_width / height if height != 0 else 0.0
+
+        # -----------------------------
+        # Convert pixels to centimeters
+        # -----------------------------
+        if height != 0:
+            cm_per_pixel = real_height / height
+            shoulder_cm = shoulder_width * cm_per_pixel
+            hip_cm = hip_width * cm_per_pixel
+        else:
+            shoulder_cm = 0.0
+            hip_cm = 0.0
 
         measurements.append(
             {
@@ -65,6 +98,8 @@ def build_measurements(keypoints_array: np.ndarray) -> list[dict]:
                 "height": height,
                 "shoulder_ratio": shoulder_ratio,
                 "hip_ratio": hip_ratio,
+                "shoulder_cm": shoulder_cm,
+                "hip_cm": hip_cm,
             }
         )
 
@@ -72,20 +107,27 @@ def build_measurements(keypoints_array: np.ndarray) -> list[dict]:
 
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)) -> dict:
+async def predict(
+    file: UploadFile = File(...),
+    height: float = Form(...)
+) -> dict:
+
     content = await file.read()
+
     try:
         image = read_image_bytes(content)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
     result = model(image, conf=0.8)[0]
+
     annotated_image = result.plot()
 
     measurements = []
+
     if result.keypoints is not None:
         keypoints = result.keypoints.xy.cpu().numpy()
-        measurements = build_measurements(keypoints)
+        measurements = build_measurements(keypoints, height)
 
     _, encoded = cv2.imencode(".jpg", annotated_image)
     image_base64 = base64.b64encode(encoded.tobytes()).decode("utf-8")
