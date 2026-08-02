@@ -1,12 +1,10 @@
 "use client";
 
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-const SERIF = { fontFamily: "'Cormorant Garamond', serif" };
-const SANS = { fontFamily: "'Inter', sans-serif" };
+import { SiteNav } from "@/app/components/SiteNav";
+import { SANS, SERIF } from "@/app/components/typography";
 
 interface Measurement {
   shoulder_width?: number;
@@ -17,7 +15,6 @@ interface Measurement {
 }
 
 export default function SizePage() {
-  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
@@ -99,25 +96,7 @@ export default function SizePage() {
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-8 md:px-16 py-6 border-b border-[#e8e8e8]">
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="flex items-center gap-2 text-[#888] hover:text-[#111] transition-colors"
-          style={SANS}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-xs tracking-[0.1em]">BACK</span>
-        </button>
-        <span
-          className="text-xl tracking-widest text-[#111]"
-          style={{ ...SERIF, fontWeight: 300, letterSpacing: "0.3em" }}
-        >
-          STYLE AI
-        </span>
-        <div className="w-16" />
-      </nav>
+      <SiteNav backHref="/" />
 
       {/* Content */}
       <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-14">

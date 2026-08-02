@@ -3,9 +3,8 @@
 import { ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
-
-const SERIF = { fontFamily: "'Cormorant Garamond', serif" };
 
 export default function HomePage() {
   const router = useRouter();
@@ -20,26 +19,21 @@ export default function HomePage() {
               key={item}
               type="button"
               className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
-              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+              style={{ ...SANS, fontWeight: 400 }}
             >
               {item}
             </button>
           ))}
         </div>
         <div className="text-center">
-          <span
-            className="text-2xl tracking-widest text-[#111]"
-            style={{ ...SERIF, fontWeight: 300, letterSpacing: "0.3em" }}
-          >
-            STYLE AI
-          </span>
+          <StyleAiWordmark className="text-2xl" />
         </div>
         <div className="flex items-center gap-6">
           <button
             type="button"
             onClick={() => router.push("/input")}
             className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+            style={{ ...SANS, fontWeight: 400 }}
           >
             SKIP
           </button>
@@ -48,7 +42,7 @@ export default function HomePage() {
             variant="ghost"
             size="sm"
             className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors h-auto p-0 rounded-none bg-transparent hover:bg-transparent"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+            style={{ ...SANS, fontWeight: 400 }}
           >
             LOGIN
           </Button>
@@ -57,7 +51,7 @@ export default function HomePage() {
             variant="outline"
             size="sm"
             className="text-[#111] text-xs tracking-[0.15em] rounded-none border-[#111] hover:bg-[#111] hover:text-white transition-colors h-auto py-1.5 px-4"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+            style={{ ...SANS, fontWeight: 400 }}
           >
             POSE DETECTION
           </Button>
@@ -99,7 +93,7 @@ export default function HomePage() {
                 transition={{ duration: 0.7, delay: 0.7 }}
                 onClick={() => router.push("/input")}
                 className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-[#111] px-7 py-3 text-xs tracking-[0.2em] hover:bg-white transition-all duration-300"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+                style={{ ...SANS, fontWeight: 400 }}
               >
                 START NOW
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -111,7 +105,7 @@ export default function HomePage() {
                 transition={{ duration: 0.7, delay: 0.8 }}
                 onClick={() => router.push("/size")}
                 className="flex items-center gap-2 border border-white/80 text-white px-7 py-3 text-xs tracking-[0.2em] hover:bg-white hover:text-[#111] transition-all duration-300"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+                style={{ ...SANS, fontWeight: 400 }}
               >
                 POSE DETECTION
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -142,7 +136,7 @@ export default function HomePage() {
               <span className="text-lg text-[#999]">{feat.icon}</span>
               <span
                 className="text-[10px] tracking-[0.2em] text-[#555]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+                style={{ ...SANS, fontWeight: 400 }}
               >
                 {feat.label}
               </span>
@@ -193,7 +187,7 @@ export default function HomePage() {
             >
               <span
                 className="text-[11px] tracking-[0.25em] text-[#aaa] mb-4"
-                style={{ fontFamily: "'Inter', sans-serif" }}
+                style={SANS}
               >
                 {item.step}
               </span>
@@ -205,7 +199,7 @@ export default function HomePage() {
               </span>
               <p
                 className="text-xs text-[#888] leading-relaxed"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 300 }}
+                style={{ ...SANS, fontWeight: 300 }}
               >
                 {item.desc}
               </p>
@@ -223,7 +217,7 @@ export default function HomePage() {
             onClick={() => router.push("/input")}
             variant="outline"
             className="flex items-center gap-2 border border-[#111] text-[#111] px-8 py-3 text-xs tracking-[0.2em] rounded-none h-auto bg-transparent hover:bg-[#111] hover:text-white transition-all duration-300"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+            style={{ ...SANS, fontWeight: 400 }}
           >
             GET STARTED
             <ArrowUpRight className="w-3.5 h-3.5" />

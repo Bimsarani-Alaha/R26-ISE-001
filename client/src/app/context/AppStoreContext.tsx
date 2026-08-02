@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import type { ClothingItem } from "@/app/data/recommendations";
 import type { BackendPrediction } from "@/app/lib/recommendationApi";
 
@@ -29,23 +35,33 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [prediction, setPrediction] = useState<BackendPrediction | null>(null);
   const [recommendations, setRecommendations] = useState<ClothingItem[]>([]);
 
+  const value = useMemo(
+    () => ({
+      requirements,
+      occasion,
+      gender,
+      colorPreference,
+      prediction,
+      recommendations,
+      setRequirements,
+      setOccasion,
+      setGender,
+      setColorPreference,
+      setPrediction,
+      setRecommendations,
+    }),
+    [
+      requirements,
+      occasion,
+      gender,
+      colorPreference,
+      prediction,
+      recommendations,
+    ],
+  );
+
   return (
-    <AppStoreContext.Provider
-      value={{
-        requirements,
-        occasion,
-        gender,
-        colorPreference,
-        prediction,
-        recommendations,
-        setRequirements,
-        setOccasion,
-        setGender,
-        setColorPreference,
-        setPrediction,
-        setRecommendations,
-      }}
-    >
+    <AppStoreContext.Provider value={value}>
       {children}
     </AppStoreContext.Provider>
   );

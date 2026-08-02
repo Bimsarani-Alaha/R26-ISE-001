@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   ArrowUpRight,
   CheckCircle,
   Heart,
@@ -14,15 +13,15 @@ import {
 import { motion } from "motion/react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { RelatedItemCard } from "@/app/components/RelatedItemCard";
+import { SiteNav } from "@/app/components/SiteNav";
+import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Card } from "@/app/components/ui/card";
 import { Separator } from "@/app/components/ui/separator";
 import { useAppStore } from "@/app/context/AppStoreContext";
 import { mockRecommendations } from "@/app/data/recommendations";
-
-const SERIF = { fontFamily: "'Cormorant Garamond', serif" };
-const SANS = { fontFamily: "'Inter', sans-serif" };
 
 const colorDots: Record<string, string> = {
   White: "#f8f8f8",
@@ -93,25 +92,11 @@ export default function DetailPage() {
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-8 md:px-16 py-6 border-b border-[#e8e8e8]">
-        <button
-          type="button"
-          onClick={() => router.push("/results")}
-          className="flex items-center gap-2 text-[#888] hover:text-[#111] transition-colors"
-          style={SANS}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-xs tracking-[0.1em]">BACK TO RESULTS</span>
-        </button>
-        <span
-          className="text-xl tracking-widest text-[#111]"
-          style={{ ...SERIF, fontWeight: 300, letterSpacing: "0.3em" }}
-        >
-          STYLE AI
-        </span>
-        <div className="w-32" />
-      </nav>
+      <SiteNav
+        backHref="/results"
+        backLabel="BACK TO RESULTS"
+        right={<div className="w-32" />}
+      />
 
       <div className="max-w-5xl mx-auto w-full px-6 md:px-12 py-12">
         {/* Main Layout */}
@@ -387,42 +372,7 @@ export default function DetailPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {related.map((rel, i) => (
-              <motion.div
-                key={rel.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 + i * 0.1 }}
-                onClick={() => router.push(`/detail/${rel.id}`)}
-                className="group cursor-pointer"
-              >
-                <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f5] mb-3">
-                  <img
-                    src={rel.image}
-                    alt={rel.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-                </div>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p
-                      className="text-sm text-[#111] tracking-wide mb-1"
-                      style={{ ...SERIF, fontWeight: 500 }}
-                    >
-                      {rel.name}
-                    </p>
-                    <p className="text-xs text-[#888]" style={SANS}>
-                      {rel.price}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-0.5 mt-0.5">
-                    <Star className="w-3 h-3 fill-[#111] text-[#111]" />
-                    <span className="text-xs text-[#888]" style={SANS}>
-                      {rel.rating}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
+              <RelatedItemCard key={rel.id} item={rel} delay={0.5 + i * 0.1} />
             ))}
           </div>
         </motion.div>
