@@ -16,17 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 import warnings
 warnings.filterwarnings('ignore')
 
-# ============================================
-# FIX: Keras-version compatibility shim.
-# ============================================
-# Same root cause explained in cvd_transformer.py / keras_compat.py: a
-# .keras file saved with a newer Keras version can fail to deserialize its
-# InputLayer on an older installed Keras (TypeError about 'batch_shape'
-# and 'optional'). Model 1 currently survives via the load_weights()
-# fallback below, but wiring safe_load_model() into the primary
-# load_model() attempt means it uses your REAL saved model + weights
-# directly (the correct, exact restore) instead of relying on the
-# less-precise by-name weight copy fallback.
+
 from keras_compat import safe_load_model
 
 # ============================================

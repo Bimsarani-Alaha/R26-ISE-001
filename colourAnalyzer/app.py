@@ -28,14 +28,6 @@ from cvd_transformer import CVDTransformer
 # ============================================
 from color_analyzer import remove_background, cleanup_mask
 
-# ============================================
-# FIX: Keras-version compatibility shim (see keras_compat.py for the full
-# explanation). This is a defense-in-depth safety net for Model 3's loader
-# below - the REAL, complete fix is matching your TensorFlow/Keras version
-# to the one the notebooks trained with (TensorFlow==2.20.0 / Keras>=3.10,
-# see requirements.txt). Once your environment matches, this shim is a
-# harmless no-op; it only activates if it ever sees the newer config keys.
-# ============================================
 from keras_compat import safe_load_model
 
 # Initialize Flask app
