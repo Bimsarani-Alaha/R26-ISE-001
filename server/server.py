@@ -5,6 +5,8 @@ import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
+from ColourAnalyzer.app import app as coloranalyzer_app
+
 
 app = FastAPI(
     title="Size Prediction API",
@@ -17,6 +19,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/coloranalyzer", coloranalyzer_app)
 
 def resolve_model_path(base_dir: str | None = None) -> str:
     base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))

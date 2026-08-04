@@ -16,12 +16,9 @@ from sklearn.preprocessing import LabelEncoder
 import warnings
 warnings.filterwarnings('ignore')
 
+from models_common import safe_load_model
 
-from keras_compat import safe_load_model
 
-# ============================================
-# STANDALONE BACKGROUND REMOVAL FUNCTIONS
-# ============================================
 
 def estimate_background_color(image, border_frac=0.04):
     h, w = image.shape[:2]
@@ -33,11 +30,8 @@ def estimate_background_color(image, border_frac=0.04):
     border_pixels = np.vstack([top, bottom, left, right]).astype(np.float32)
     return np.median(border_pixels, axis=0)
 
-
 def _lab_distance_map(image, bg_color_rgb):
-    """FIX: New helper. Per-pixel LAB distance of `image` from a single
-    RGB background color estimate. Used both to seed GrabCut and as the
-    final safety-net filter in analyze()."""
+    """Helper. Per-pixel LAB distance of `image` from a single RGB background color estimate."""
     img_f = image.astype(np.float32) / 255.0
     lab_img = cv2.cvtColor(img_f, cv2.COLOR_RGB2LAB)
     bg_lab = cv2.cvtColor(
@@ -47,19 +41,17 @@ def _lab_distance_map(image, bg_color_rgb):
     dist = np.sqrt(np.sum((lab_img - bg_lab) ** 2, axis=2))
     return dist, lab_img
 
-
 def remove_background(image):
-
     h, w = image.shape[:2]
     bg_color_rgb = estimate_background_color(image)
     dist, _ = _lab_distance_map(image, bg_color_rgb)
 
-    # --- Strategy 1: GrabCut seeded with a real trimap ---
+    # Strategy 1: GrabCut seeded with a real trimap
     try:
         gc_mask = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
-        gc_mask[dist > 18] = cv2.GC_PR_FGD   # probably foreground
-        gc_mask[dist > 35] = cv2.GC_FGD      # definitely foreground
-        gc_mask[dist < 6] = cv2.GC_BGD       # definitely background
+        gc_mask[dist > 18] = cv2.GC_PR_FGD
+        gc_mask[dist > 35] = cv2.GC_FGD
+        gc_mask[dist < 6] = cv2.GC_BGD
 
         bgd = np.zeros((1, 65), np.float64)
         fgd = np.zeros((1, 65), np.float64)
@@ -76,7 +68,6 @@ def remove_background(image):
             largest = np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1
             bm = (lab_cc == largest).astype('uint8')
 
-     
         bm = cv2.erode(bm, np.ones((5, 5), np.uint8), iterations=1)
 
         if 0.05 < bm.mean() < 0.95:
@@ -84,7 +75,7 @@ def remove_background(image):
     except Exception:
         pass
 
-    # --- Strategy 2: edge/contour fallback, also color-seeded ---
+    # Strategy 2: edge/contour fallback
     try:
         fg_probable = (dist > 18).astype(np.uint8) * 255
         edges = cv2.Canny(fg_probable, 50, 150)
@@ -101,7 +92,7 @@ def remove_background(image):
     except Exception:
         pass
 
-    # --- Strategy 3: pure color-distance threshold, no shape assumption ---
+    # Strategy 3: pure color-distance threshold
     bm = (dist > 18).astype('uint8')
     bm = cv2.morphologyEx(bm, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     bm = cv2.morphologyEx(bm, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
@@ -112,11 +103,10 @@ def remove_background(image):
     if bm.sum() > 100:
         return bm
 
-    # --- Last resort: centered ellipse (unchanged) ---
+    # Last resort: centered ellipse
     bm = np.zeros((h, w), dtype='uint8')
     cv2.ellipse(bm, (w // 2, h // 2), (int(w * 0.42), int(h * 0.42)), 0, 0, 360, 1, -1)
     return bm
-
 
 def cleanup_mask(mask):
     """Remove noise, keep largest region, fill holes"""
@@ -127,7 +117,6 @@ def cleanup_mask(mask):
         mask = (lab == largest).astype('uint8')
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((10, 10), np.uint8))
     return mask
-
 
 def preprocess_image(image, size=(224, 224)):
     """Preprocess for training"""
@@ -197,9 +186,6 @@ class ColorAnalyzer:
         try:
             print(f"📥 Loading weights from: {model_path}")
             try:
-                # FIX: use safe_load_model() so the InputLayer batch_shape/
-                # optional Keras-version mismatch can't silently push this
-                # onto the less-precise load_weights() fallback below.
                 full_model = safe_load_model(model_path, compile=False)
                 print("✅ Full model loaded!")
 
@@ -241,7 +227,6 @@ class ColorAnalyzer:
         }
 
     def _grid_segments(self, h, w, n=16):
-       
         segs = np.zeros((h, w), dtype=np.int32)
         gh, gw = max(4, h // n), max(4, w // n)
         sid = 1
@@ -301,7 +286,7 @@ class ColorAnalyzer:
         if mask.sum() < 100:
             return [], mask, None
 
-        # STEP 2: LAB conversion (reused below for the background safety net too)
+        # STEP 2: LAB conversion
         lab = cv2.cvtColor((image.astype(np.float32) / 255.0), cv2.COLOR_RGB2LAB)
 
         bg_color_rgb = estimate_background_color(image)

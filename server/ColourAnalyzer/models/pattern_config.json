@@ -1,0 +1,16 @@
+{
+  "input_size": [
+    224,
+    224
+  ],
+  "model_files": {
+    "keras": "models/final_model.keras",
+    "h5": "models/final_model.h5",
+    "tflite": "models/final_model.tflite",
+    "architecture_code": "models/pattern_architecture.py",
+    "weights_npz": "models/pattern_model_weights.npz"
+  },
+  "test_masked_pixel_accuracy": 0.8979967832565308,
+  "test_iou": 0.7860231995582581,
+  "notes": "Colour1=Black=0, Colour2=White=1. Background is fully removed before inference. Use pattern_architecture.py + pattern_model_weights.npz for cross-Keras-version loading (works on Keras 2 and Keras 3 alike); the .keras/.h5 files only load reliably in the same Keras major version this notebook trained under."
+}

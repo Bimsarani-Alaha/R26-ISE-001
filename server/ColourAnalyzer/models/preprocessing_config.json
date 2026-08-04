@@ -23,12 +23,15 @@
   "normalization": "divide_by_255",
   "dtype": "float32",
   "model_files": {
-    "keras": "models/final_model.keras",
-    "h5": "models/final_model.h5",
+    "architecture_py": "models/cvd_generator_architecture.py",
+    "universal_weights": "models/cvd_generator.weights.h5",
+    "keras_same_version_only": "models/final_model.keras",
+    "h5_same_version_only": "models/final_model.h5",
     "tflite": "models/final_model.tflite",
     "cvd_types": "models/cvd_types.npy",
     "color_classes": "models/color_classes.npy"
   },
+  "recommended_loader": "universal_cvd_transformer.CVDColorTransformer",
   "color_prototypes_by_cvd_type_file": "color_prototypes_by_cvd_type.json",
   "pixel_tolerance_for_color_accuracy": 0.06
 }
