@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 
 type ColorInfo = {
+  palette?: { hex: string; percentage: number }[] | null;
   hex: string;
   name: string;
   rgb: number[];
@@ -243,6 +244,7 @@ export default function ClothingMatcher() {
               Dominant colours detected
             </p>
             <div className="grid grid-cols-2 gap-3">
+              {/* Multi-colour palette display */}
               {[
                 { label: "Top", color: result.top_color },
                 { label: "Bottom", color: result.bottom_color },
@@ -254,6 +256,8 @@ export default function ClothingMatcher() {
                   <span className="text-xs text-gray-400 uppercase tracking-wide">
                     {label}
                   </span>
+
+                  {/* Dominant colour circle */}
                   <div
                     className="w-14 h-14 rounded-full border-2 border-white shadow-sm"
                     style={{ background: color.hex }}
@@ -261,9 +265,28 @@ export default function ClothingMatcher() {
                   <span className="text-sm font-semibold text-gray-800">
                     {color.name}
                   </span>
-                  <span className="text-xs text-gray-400 font-mono">
-                    {color.hex.toUpperCase()}
-                  </span>
+
+                  {/* Palette strip — all 3 colours side by side */}
+                  {color.palette && color.palette.length > 1 && (
+                    <div className="flex gap-1 mt-1">
+                      {color.palette.map(
+                        (p: { hex: string; percentage: number }, i: number) => (
+                          <div
+                            key={i}
+                            className="flex flex-col items-center gap-0.5"
+                          >
+                            <div
+                              className="w-7 h-7 rounded border border-white"
+                              style={{ background: p.hex }}
+                            />
+                            <span className="text-[10px] text-gray-400">
+                              {p.percentage}%
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
