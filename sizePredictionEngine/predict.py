@@ -3,11 +3,11 @@ import cv2
 import numpy as np  # mathematical calculations
 
 model_path = "Y26sizeEnginev6.0.pt"
-image_path = "img32.jpeg"
+image_path = "img42.jpeg"
 
 # User manually enters their actual height in centimeters
 # This value will later come from your backend/frontend.
-real_height = 144.78   # in centimeters
+real_height = 156   # in centimeters
 
 
 model = YOLO(model_path)
