@@ -14,7 +14,7 @@ app = FastAPI(title="CVD Clothing Matcher API", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
