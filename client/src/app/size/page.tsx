@@ -136,13 +136,13 @@ export default function SizePage() {
           className="overflow-hidden rounded-none border border-[#e8e8e8] bg-[#f7f4ee] shadow-[0_20px_80px_-30px_rgba(17,17,17,0.25)]"
         >
           <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="relative min-h-[420px] overflow-hidden rounded-none">
+            <div className="relative min-h-105 overflow-hidden rounded-none">
               <img
                 src="/sizeHome.jpg"
                 alt="Size measurement hero image"
                 className="absolute inset-0 h-full w-full rounded-none object-cover object-top"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/20 to-transparent" />
 
               <div className="relative flex h-full flex-col justify-between p-8 sm:p-10 lg:p-12">
 
