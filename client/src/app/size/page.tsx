@@ -138,8 +138,8 @@ export default function SizePage() {
           <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
             <div className="relative min-h-[420px] overflow-hidden rounded-none">
               <img
-                src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1800"
-                alt="Clothing size measurement portrait"
+                src="/sizeHome.jpg"
+                alt="Size measurement hero image"
                 className="absolute inset-0 h-full w-full rounded-none object-cover object-top"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
@@ -181,7 +181,6 @@ export default function SizePage() {
 
             <div className="flex flex-col justify-center bg-white p-8 sm:p-10 lg:p-12">
               <div className="mb-4 flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#777]" style={SANS}>
-                <Sparkles className="h-3.5 w-3.5" />
                 START YOUR ANALYSIS
               </div>
 
@@ -314,15 +313,19 @@ export default function SizePage() {
               {[
                 {
                   title: "01 · UPLOAD",
-                  desc: "Choose a clear full-body image so the pose detector can map the silhouette accurately.",
+                  desc: "Upload a clear full-body image. For more accurate size prediction, stand approximately 2 meters away from the camera while capturing the image",
                 },
                 {
                   title: "02 · SCALE",
-                  desc: "Enter your real height so the measurements can be converted into centimeters with greater precision.",
+                  desc: "Enter your real height in centimeters (cm). The system uses your height to accurately convert the detected shoulder and hip measurements into centimeters.",
                 },
                 {
                   title: "03 · REVIEW",
-                  desc: "Inspect the result image and refined measurements in a calm, focused layout.",
+                  desc: "Review the processed image and the calculated body measurements, including your shoulder width, hip width, and height.",
+                },
+                {
+                  title: "04 · SIZE",
+                  desc: "Based on your body measurements, the system recommends the most suitable torso clothing size (S, M, L, XL, etc.) for a better fit.",
                 },
               ].map((item) => (
                 <div key={item.title} className="border-b border-[#e5e5e5] pb-4 last:border-b-0 last:pb-0">
