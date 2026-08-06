@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+venv/
+env/
+ENV/
+.python-version
+.idea/
+.vscode/
+
+# Models / artifacts
+artifacts/
+
+# Data
+data/
+
+# Test results
+test_results/
+recommended_products.csv
+
+# Node / Vite frontend
+node_modules/
+dist/
+*.local
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
