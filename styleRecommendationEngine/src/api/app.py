@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.utils.predict_utils import (
@@ -7,6 +8,13 @@ from src.utils.predict_utils import (
 )
 
 app = FastAPI(title="Fashion AI API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class RequestBody(BaseModel):
     text: str

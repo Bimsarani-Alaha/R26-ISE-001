@@ -1,11 +1,17 @@
 import base64
 import os
+import sys
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 from ColourAnalyzer.app import app as coloranalyzer_app
+
+REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(REPO_ROOT, "styleRecommendationEngine"))
+
+from src.api.app import app as styleanalyzer_app  # noqa: E402
 
 
 app = FastAPI(
@@ -21,6 +27,7 @@ app.add_middleware(
 )
 
 app.mount("/coloranalyzer", coloranalyzer_app)
+app.mount("/styleanalyzer", styleanalyzer_app)
 
 def resolve_model_path(base_dir: str | None = None) -> str:
     base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))

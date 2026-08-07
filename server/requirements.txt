@@ -12,3 +12,6 @@ httpx==0.25.1
 pillow==10.1.0
 ultralytics==8.4.115
 watchfiles==1.2.0
+torch==2.2.2
+transformers==4.41.2
+sentence-transformers==2.7.0
