@@ -28,7 +28,7 @@ const FASHION_TIPS = [
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const { requirements, occasion, gender, colorPreference, setPrediction, setRecommendations } =
+  const { requirements, occasion, setPrediction, setRecommendations } =
     useAppStore();
   const [stepIndex, setStepIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -63,13 +63,8 @@ export default function ProcessingPage() {
     const runPrediction = async () => {
       try {
         setError("");
-        const filters = [
-          occasion && `Occasion: ${occasion}`,
-          gender && `Gender: ${gender}`,
-          colorPreference && `Colour preference: ${colorPreference}`,
-        ].filter(Boolean);
-        const prompt = filters.length
-          ? `${requirements}. ${filters.join(". ")}.`
+        const prompt = occasion
+          ? `Occasion: ${occasion}. ${requirements}`
           : requirements;
         const result = await fetchRecommendations(prompt);
 
@@ -107,7 +102,7 @@ export default function ProcessingPage() {
         clearTimeout(redirectTimer);
       }
     };
-  }, [router, requirements, occasion, gender, colorPreference, setPrediction, setRecommendations]);
+  }, [router, requirements, occasion, setPrediction, setRecommendations]);
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
