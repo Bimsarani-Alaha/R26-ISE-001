@@ -1,0 +1,22 @@
+{
+  "num_classes": 10,
+  "img_size": [
+    224,
+    224
+  ],
+  "class_names": [
+    "black",
+    "blue",
+    "brown",
+    "green",
+    "orange",
+    "pink",
+    "purple",
+    "red",
+    "white",
+    "yellow"
+  ],
+  "architecture_file": "base_color_architecture.py",
+  "weights_file": "base_color_model_weights.npz",
+  "notes": "Use base_color_architecture.py + base_color_model_weights.npz for cross-Keras-version loading (Keras 2 and Keras 3 alike). The optional .keras/.h5 file only loads reliably in the same Keras major version this notebook trained under."
+}
