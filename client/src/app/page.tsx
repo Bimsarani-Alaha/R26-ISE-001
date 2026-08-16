@@ -29,6 +29,15 @@ export default function HomePage() {
           <StyleAiWordmark className="text-2xl" />
         </div>
         <div className="flex items-center gap-6">
+          {/* NEW: Color Analyzer button in navigation */}
+          <button
+            type="button"
+            onClick={() => router.push("/color-analyzer")}
+            className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
+            style={{ ...SANS, fontWeight: 400 }}
+          >
+            ANALYZER
+          </button>
           <button
             type="button"
             onClick={() => router.push("/input")}
@@ -115,23 +124,35 @@ export default function HomePage() {
         </motion.div>
       </div>
 
-      {/* Feature strip */}
+      {/* Feature strip - UPDATED with COLOR ANALYZER */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.9 }}
         className="border-t border-[#e8e8e8]"
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
+        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
           {[
-            { icon: "◯", label: "AI OUTFIT CURATION" },
-            { icon: "◈", label: "OCCASION MATCHING" },
-            { icon: "◻", label: "STYLE INTELLIGENCE" },
-            { icon: "⊹", label: "PERSONALIZED PICKS" },
+            { icon: "◯", label: "AI OUTFIT CURATION", action: null },
+            { icon: "◈", label: "OCCASION MATCHING", action: null },
+            { icon: "◻", label: "STYLE INTELLIGENCE", action: null },
+            { icon: "⊹", label: "PERSONALIZED PICKS", action: null },
+            // NEW: Color Analyzer button in feature strip
+            { 
+              icon: "●", 
+              label: "COLOR ANALYZER", 
+              action: () => router.push("/color-analyzer"),
+              isClickable: true 
+            },
           ].map((feat) => (
             <div
               key={feat.label}
-              className="flex flex-col items-center gap-3 py-8 px-6 hover:bg-[#fafafa] transition-colors cursor-default"
+              onClick={feat.action || undefined}
+              className={`flex flex-col items-center gap-3 py-8 px-6 transition-colors ${
+                feat.isClickable 
+                  ? "cursor-pointer hover:bg-[#f5f0eb]" 
+                  : "cursor-default hover:bg-[#fafafa]"
+              }`}
             >
               <span className="text-lg text-[#999]">{feat.icon}</span>
               <span
