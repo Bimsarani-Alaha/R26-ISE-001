@@ -1,0 +1,6 @@
+{
+  "num_classes": 2204,
+  "architecture_file": "colour_name_architecture.py",
+  "weights_file": "colour_name_model_weights.npz",
+  "classes_file": "colour_name_classes.json"
+}
