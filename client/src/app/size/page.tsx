@@ -13,6 +13,7 @@ type Measurement = {
   height?: number;
   shoulder_cm?: number;
   hip_cm?: number;
+  size?: string;
 };
 
 export default function SizePage() {
@@ -24,6 +25,7 @@ export default function SizePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [height, setHeight] = useState("");
+  const [gender, setGender] = useState("Women");
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -48,9 +50,15 @@ export default function SizePage() {
       return;
     }
 
+    if (!gender) {
+      setMessage("Please select your gender for size estimation.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("height", height);
+    formData.append("gender", gender);
 
     setLoading(true);
     setMessage("");
@@ -223,21 +231,43 @@ export default function SizePage() {
                   />
                 </div>
 
-                <Button
-                  className="mt-5 w-full rounded-none border border-[#111] bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-all hover:bg-[#222]"
-                  onClick={handleUpload}
-                  disabled={loading}
-                  style={{ ...SANS, fontWeight: 400 }}
-                >
-                  {loading ? "PROCESSING..." : "PREDICT IMAGE"}
-                </Button>
+                  <div className="mt-5">
+                    <div className="text-sm font-medium text-[#111]">Gender</div>
+                    <div className="mt-3 flex gap-3">
+                      {['Women', 'Men'].map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setGender(option)}
+                          className={`rounded-none border px-4 py-2 text-xs tracking-[0.12em] transition-all ${
+                            gender === option
+                              ? 'bg-[#111] text-white border-[#111]'
+                              : 'bg-white text-[#555] border-[#ddd] hover:border-[#999] hover:text-[#111]'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                {message && (
-                  <p className="mt-4 text-sm leading-6 text-[#666]">{message}</p>
-                )}
+                  <button
+                    type="button"
+                    onClick={handleUpload}
+                    disabled={loading}
+                    className="mt-6 w-full rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? 'PROCESSING...' : 'PREDICT IMAGE'}
+                  </button>
+
+                  {message && (
+                    <p className="mt-4 text-sm leading-6 text-[#666]" style={SANS}>
+                      {message}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
         </motion.section>
 
         <motion.div
@@ -283,6 +313,10 @@ export default function SizePage() {
                         <div className="mt-3 text-sm text-[#777]" style={SANS}>Hip</div>
                         <div className="text-base font-semibold text-[#111]">
                           {m.hip_cm?.toFixed(2) ?? "N/A"}
+                        </div>
+                        <div className="mt-3 text-sm text-[#777]" style={SANS}>Size</div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.size ?? "N/A"}
                         </div>
                         <div className="mt-3 text-sm text-[#777]" style={SANS}>Height</div>
                         <div className="text-base font-semibold text-[#111]">
