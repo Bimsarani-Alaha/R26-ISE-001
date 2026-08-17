@@ -2,10 +2,20 @@ import base64
 import os
 import cv2
 import numpy as np
+import sys
+from pathlib import Path
+
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 from ColourAnalyzer.app import app as coloranalyzer_app
+
+
+# Ensure the sizePredictionEngine folder is importable by this server module.
+base_dir = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(base_dir / "sizePredictionEngine"))
+
+from sizeAnalyzer import get_size_label
 
 
 app = FastAPI(
@@ -54,7 +64,7 @@ def read_image_bytes(data: bytes) -> np.ndarray:
     return image
 
 
-def build_measurements(keypoints_array: np.ndarray, real_height: float) -> list[dict]:
+def build_measurements(keypoints_array: np.ndarray, real_height: float, gender: str = "women") -> list[dict]:
     measurements = []
 
     for person in keypoints_array:
@@ -95,6 +105,8 @@ def build_measurements(keypoints_array: np.ndarray, real_height: float) -> list[
             shoulder_cm = 0.0
             hip_cm = 0.0
 
+        size_label = get_size_label(shoulder_cm, hip_cm, gender)
+
         measurements.append(
             {
                 "shoulder_width": shoulder_width,
@@ -104,6 +116,7 @@ def build_measurements(keypoints_array: np.ndarray, real_height: float) -> list[
                 "hip_ratio": hip_ratio,
                 "shoulder_cm": shoulder_cm,
                 "hip_cm": hip_cm,
+                "size": size_label,
             }
         )
 
@@ -113,7 +126,8 @@ def build_measurements(keypoints_array: np.ndarray, real_height: float) -> list[
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...),
-    height: float = Form(...)
+    height: float = Form(...),
+    gender: str = Form("women")
 ) -> dict:
 
     content = await file.read()
@@ -131,7 +145,7 @@ async def predict(
 
     if result.keypoints is not None:
         keypoints = result.keypoints.xy.cpu().numpy()
-        measurements = build_measurements(keypoints, height)
+        measurements = build_measurements(keypoints, height, gender)
 
     _, encoded = cv2.imencode(".jpg", annotated_image)
     image_base64 = base64.b64encode(encoded.tobytes()).decode("utf-8")
