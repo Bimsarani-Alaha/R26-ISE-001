@@ -9,6 +9,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 from ColourAnalyzer.app import app as coloranalyzer_app
+from cvdMatcher.main import app as cvdmatcher_app
 
 
 # Ensure the sizePredictionEngine folder is importable by this server module.
@@ -31,6 +32,7 @@ app.add_middleware(
 )
 
 app.mount("/coloranalyzer", coloranalyzer_app)
+app.mount("/cvdmatcher", cvdmatcher_app)
 
 def resolve_model_path(base_dir: str | None = None) -> str:
     base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))
