@@ -87,7 +87,7 @@ export default function ClothingMatcher() {
     form.append("cvd_type", cvdType);
 
     try {
-      const res = await fetch("http://localhost:8000/analyse", {
+      const res = await fetch("http://localhost:8000/cvdmatcher/analyse", {
         method: "POST",
         body: form,
       });
