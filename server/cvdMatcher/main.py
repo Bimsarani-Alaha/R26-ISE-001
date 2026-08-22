@@ -1,15 +1,16 @@
+import os
+import io
+import pickle
+import numpy as np
+import pandas as pd
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
-import numpy as np
 from skimage import color
 from skimage.color import deltaE_ciede2000
 from sklearn.cluster import KMeans
-from rembg import remove as remove_bg, new_session  
-import pickle
-import io
-import os
-import pandas as pd
+from rembg import remove as remove_bg, new_session
 
 
 app = FastAPI(title="CVD Clothing Matcher API", version="2.0")
@@ -21,6 +22,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Resolve model paths relative to THIS file, not the process's working
+# directory. This is what lets main.py be imported and mounted from
+# server.py (running from anywhere) instead of only working when you `cd`
+# into cvdMatcher/ and run it directly.
+# ─────────────────────────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PKL_PATH = os.path.join(BASE_DIR, "model.pkl")
+MODEL_H5_PATH = os.path.join(BASE_DIR, "model.h5")
+
 FEATURE_COLUMNS = [
     "weighted_avg_de", "min_de", "max_de", "de_range",
     "n_colors_top", "n_colors_bot",
@@ -30,23 +41,23 @@ FEATURE_COLUMNS = [
 
 # ── Load Models ────────────────────────────────────────────────────────────────
 
-with open("model.pkl", "rb") as f:
+with open(MODEL_PKL_PATH, "rb") as f:
     rf_model = pickle.load(f)
 print("✅ Random Forest model loaded")
 
 nn_model = None
 try:
     from tensorflow.keras.models import load_model
-    if os.path.exists("model.h5"):
-        nn_model = load_model("model.h5")
+    if os.path.exists(MODEL_H5_PATH):
+        nn_model = load_model(MODEL_H5_PATH)
         print("✅ Neural Network model loaded")
     else:
         print("⚠️  model.h5 not found — running RF-only mode")
 except Exception as e:
     print(f"⚠️  Could not load model.h5: {e} — running RF-only mode")
 
-    # ── Pre-load rembg session at startup ─────────────────────────────────────────
-REMBG_SESSION = new_session("u2net")   # ← ADD THIS BLOCK
+# ── Pre-load rembg session at startup ─────────────────────────────────────────
+REMBG_SESSION = new_session("u2net")
 print("✅ Background removal model loaded")
 
 # Label order must match training encoding: Good=0, Moderate=1, Poor=2
@@ -340,7 +351,6 @@ def get_hue_category(rgb):
 # ── CVD Colour Confusion Pairs ─────────────────────────────────────────────────
 CVD_CONFUSION = {
     "Protanopia": [
-        # Red-green confusion (no red cone)
         ("red", "green"), ("red", "cyan"), ("red", "gray"),
         ("orange", "green"), ("orange", "cyan"), ("orange", "gray"),
         ("red", "olive"), ("red", "brown"), ("red", "teal"),
@@ -354,7 +364,6 @@ CVD_CONFUSION = {
         ("red", "lime"), ("orange", "lime"),
     ],
     "Deuteranopia": [
-        # Red-green confusion (no green cone)
         ("red", "green"), ("red", "yellow"), ("red", "olive"),
         ("orange", "yellow"), ("orange", "green"), ("orange", "olive"),
         ("green", "yellow"), ("green", "brown"), ("green", "gray"),
@@ -369,7 +378,6 @@ CVD_CONFUSION = {
         ("magenta", "red"), ("pink", "yellow"),
     ],
     "Tritanopia": [
-        # Blue-yellow confusion (no blue cone)
         ("blue", "yellow"), ("blue", "orange"), ("blue", "green"),
         ("violet", "yellow"), ("violet", "orange"), ("violet", "red"),
         ("cyan", "pink"), ("cyan", "gray"), ("cyan", "white"),
@@ -386,7 +394,6 @@ CVD_CONFUSION = {
 
 # ── Colour Display Names ────────────────────────────────────────────────────────
 COLOR_NAMES = {
-    # Neutrals
     "white":      "White",
     "black":      "Black",
     "gray":       "Gray",
@@ -395,8 +402,6 @@ COLOR_NAMES = {
     "beige":      "Beige",
     "cream":      "Cream/Off-White",
     "ivory":      "Ivory",
-
-    # Reds & Pinks
     "red":        "Red",
     "crimson":    "Crimson",
     "maroon":     "Maroon",
@@ -406,8 +411,6 @@ COLOR_NAMES = {
     "pink":       "Pink",
     "hot_pink":   "Hot Pink",
     "blush":      "Blush",
-
-    # Oranges & Browns
     "orange":     "Orange",
     "amber":      "Amber",
     "brown":      "Brown",
@@ -416,15 +419,11 @@ COLOR_NAMES = {
     "rust":       "Rust",
     "copper":     "Copper",
     "peach":      "Peach",
-
-    # Yellows
     "yellow":     "Yellow",
     "gold":       "Gold",
     "lime":       "Lime Green",
     "olive":      "Olive",
     "mustard":    "Mustard",
-
-    # Greens
     "green":      "Green",
     "teal":       "Teal",
     "emerald":    "Emerald Green",
@@ -433,8 +432,6 @@ COLOR_NAMES = {
     "forest":     "Forest Green",
     "army":       "Army Green",
     "cyan":       "Cyan",
-
-    # Blues
     "blue":       "Blue",
     "navy":       "Navy Blue",
     "sky":        "Sky Blue",
@@ -443,8 +440,6 @@ COLOR_NAMES = {
     "cobalt":     "Cobalt Blue",
     "periwinkle": "Periwinkle",
     "steel":      "Steel Blue",
-
-    # Purples
     "purple":     "Purple",
     "violet":     "Violet",
     "indigo":     "Indigo",
@@ -507,19 +502,16 @@ async def analyse(
         if not data:
             raise HTTPException(status_code=400, detail=f"Empty file for {name}")
 
-    # Palettes only — do NOT call get_dominant_color() separately;
-    # the model was trained on palette[0], not a second KMeans fit.
     top_palette    = get_color_palette(top_bytes,    n=3)
     bottom_palette = get_color_palette(bottom_bytes, n=3)
 
-    # Adapt "percentage" (main.py's key) -> "pct" (what multi_color_delta_e expects)
     top_pairs    = [{"rgb": c["rgb"], "pct": c["percentage"] / 100} for c in top_palette]
     bottom_pairs = [{"rgb": c["rgb"], "pct": c["percentage"] / 100} for c in bottom_palette]
 
     scores  = multi_color_delta_e(top_pairs, bottom_pairs)
     top_rgb    = top_palette[0]["rgb"]
     bottom_rgb = bottom_palette[0]["rgb"]
-    delta_e    = calculate_delta_e(top_rgb, bottom_rgb)  # display-only, single dominant pair
+    delta_e    = calculate_delta_e(top_rgb, bottom_rgb)
 
     feature_row = {
         "weighted_avg_de": scores["weighted_avg_de"],
@@ -566,4 +558,3 @@ async def analyse(
         "bottom_hard": is_hard_to_distinguish(bottom_cat, cvd_type),
         "cvd_tip": cvd_tip,
     }
-    
