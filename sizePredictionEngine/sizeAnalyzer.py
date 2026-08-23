@@ -2,30 +2,28 @@ from __future__ import annotations
 
 CHARTS = {
     "women": [
-        {"size": "XXS", "shoulder_min": 32.0, "shoulder_max": 34.0, "hip_min": 27.0, "hip_max": 29.5},
-        {"size": "XS", "shoulder_min": 34.0, "shoulder_max": 36.5, "hip_min": 28.0, "hip_max": 31.5},
-        {"size": "S", "shoulder_min": 35.5, "shoulder_max": 39.0, "hip_min": 30.5, "hip_max": 34.5},
-        {"size": "M", "shoulder_min": 38.0, "shoulder_max": 40.5, "hip_min": 34.0, "hip_max": 38.5},
-        {"size": "L", "shoulder_min": 39.5, "shoulder_max": 42.5, "hip_min": 36.5, "hip_max": 41.5},
-        {"size": "XL", "shoulder_min": 41.5, "shoulder_max": 45.0, "hip_min": 40.0, "hip_max": 45.5},
-        {"size": "XXL", "shoulder_min": 44.5, "shoulder_max": 48.5, "hip_min": 45.0, "hip_max": 50.5},
-        {"size": "3XL", "shoulder_min": 48.0, "shoulder_max": 52.0, "hip_min": 50.0, "hip_max": 54.0},
-        {"size": "4XL", "shoulder_min": 51.5, "shoulder_max": 55.5, "hip_min": 54.0, "hip_max": 58.0},
+        {"size": "XS", "shoulder_min": 29.69, "shoulder_max": 37.79, "hip_min": 25.01, "hip_max": 30.20},
+        {"size": "S", "shoulder_min": 37.80, "shoulder_max": 39.64, "hip_min": 30.21, "hip_max": 32.38},
+        {"size": "M", "shoulder_min": 39.65, "shoulder_max": 41.33, "hip_min": 32.39, "hip_max": 35.00},
+        {"size": "L", "shoulder_min": 41.34, "shoulder_max": 41.81, "hip_min": 35.01, "hip_max": 36.50},
+        {"size": "XL", "shoulder_min": 41.82, "shoulder_max": 44.31, "hip_min": 36.51, "hip_max": 42.09},
+        {"size": "XXL", "shoulder_min": 44.32, "shoulder_max": 45.32, "hip_min": 36.59, "hip_max": 40.99},
+        {"size": "3XL", "shoulder_min": 45.33, "shoulder_max": 45.97, "hip_min": 41.04, "hip_max": 41.53},
+        {"size": "4XL", "shoulder_min": 45.98, "shoulder_max": 55.50, "hip_min": 41.54, "hip_max": 58.00},
     ],
     "men": [
-        {"size": "XXS", "shoulder_min": 35.0, "shoulder_max": 37.5, "hip_min": 28.0, "hip_max": 31.0},
-        {"size": "XS", "shoulder_min": 38.0, "shoulder_max": 40.5, "hip_min": 30.0, "hip_max": 33.5},
-        {"size": "S", "shoulder_min": 39.5, "shoulder_max": 42.5, "hip_min": 33.0, "hip_max": 36.5},
-        {"size": "M", "shoulder_min": 41.5, "shoulder_max": 44.5, "hip_min": 35.0, "hip_max": 39.5},
-        {"size": "L", "shoulder_min": 43.5, "shoulder_max": 47.5, "hip_min": 38.0, "hip_max": 42.5},
-        {"size": "XL", "shoulder_min": 46.5, "shoulder_max": 50.5, "hip_min": 41.5, "hip_max": 46.0},
-        {"size": "XXL", "shoulder_min": 49.5, "shoulder_max": 53.5, "hip_min": 45.0, "hip_max": 49.5},
-        {"size": "3XL", "shoulder_min": 52.5, "shoulder_max": 56.5, "hip_min": 48.5, "hip_max": 52.5},
-        {"size": "4XL", "shoulder_min": 55.5, "shoulder_max": 60.0, "hip_min": 51.5, "hip_max": 56.0},
+        {"size": "XS", "shoulder_min": 38.00, "shoulder_max": 40.83, "hip_min": 30.00, "hip_max": 33.56},
+        {"size": "S", "shoulder_min": 40.84, "shoulder_max": 42.99, "hip_min": 33.57, "hip_max": 36.50},
+        {"size": "M", "shoulder_min": 43.00, "shoulder_max": 44.75, "hip_min": 35.57, "hip_max": 38.08},
+        {"size": "L", "shoulder_min": 44.76, "shoulder_max": 47.56, "hip_min": 38.09, "hip_max": 40.54},
+        {"size": "XL", "shoulder_min": 47.57, "shoulder_max": 49.50, "hip_min": 40.55, "hip_max": 42.00},
+        {"size": "XXL", "shoulder_min": 49.51, "shoulder_max": 53.50, "hip_min": 42.01, "hip_max": 46.00},
+        {"size": "3XL", "shoulder_min": 53.51, "shoulder_max": 56.50, "hip_min": 46.01, "hip_max": 52.50},
+        {"size": "4XL", "shoulder_min": 56.51, "shoulder_max": 60.00, "hip_min": 52.51, "hip_max": 56.00},
     ],
 }
 
-SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"]
+SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"]
 
 
 def normalize_gender(gender: str) -> str:
