@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from ColourAnalyzer.app import app as coloranalyzer_app
 
@@ -15,6 +16,7 @@ from ColourAnalyzer.app import app as coloranalyzer_app
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(base_dir / "sizePredictionEngine"))
 
+from health_tips import HealthTipsConfigurationError, generate_health_tips
 from sizeAnalyzer import get_size_label
 
 
@@ -31,6 +33,33 @@ app.add_middleware(
 )
 
 app.mount("/coloranalyzer", coloranalyzer_app)
+
+
+class HealthTipsRequest(BaseModel):
+    shoulder_width: float = Field(gt=0)
+    hip_size: float = Field(gt=0)
+    height: float = Field(gt=0)
+    gender: str = "unspecified"
+
+
+@app.post("/api/health-tips")
+async def health_tips(request: HealthTipsRequest) -> dict[str, str]:
+    try:
+        guidance = await generate_health_tips(
+            shoulder_width=request.shoulder_width,
+            hip_size=request.hip_size,
+            height=request.height,
+            gender=request.gender,
+        )
+    except HealthTipsConfigurationError as error:
+        raise HTTPException(status_code=503, detail="The guidance service is not configured.") from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail="The guidance service is unavailable.") from error
+
+    if not guidance:
+        raise HTTPException(status_code=502, detail="The guidance service returned an empty response.")
+
+    return {"guidance": guidance}
 
 def resolve_model_path(base_dir: str | None = None) -> str:
     base_dir = os.path.abspath(base_dir or os.path.dirname(os.path.dirname(__file__)))

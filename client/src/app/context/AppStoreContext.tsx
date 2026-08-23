@@ -17,12 +17,21 @@ type AppStore = {
   colorPreference: string;
   prediction: BackendPrediction | null;
   recommendations: ClothingItem[];
+  bodyMeasurements: BodyMeasurements | null;
   setRequirements: (v: string) => void;
   setOccasion: (v: string) => void;
   setGender: (v: string) => void;
   setColorPreference: (v: string) => void;
   setPrediction: (v: BackendPrediction | null) => void;
   setRecommendations: (v: ClothingItem[]) => void;
+  setBodyMeasurements: (v: BodyMeasurements | null) => void;
+};
+
+export type BodyMeasurements = {
+  shoulderCm: number;
+  hipCm: number;
+  heightCm: number;
+  gender: string;
 };
 
 const AppStoreContext = createContext<AppStore | null>(null);
@@ -34,6 +43,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [colorPreference, setColorPreference] = useState("");
   const [prediction, setPrediction] = useState<BackendPrediction | null>(null);
   const [recommendations, setRecommendations] = useState<ClothingItem[]>([]);
+  const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurements | null>(null);
 
   const value = useMemo(
     () => ({
@@ -43,12 +53,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       colorPreference,
       prediction,
       recommendations,
+      bodyMeasurements,
       setRequirements,
       setOccasion,
       setGender,
       setColorPreference,
       setPrediction,
       setRecommendations,
+      setBodyMeasurements,
     }),
     [
       requirements,
@@ -57,6 +69,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       colorPreference,
       prediction,
       recommendations,
+      bodyMeasurements,
     ],
   );
 
