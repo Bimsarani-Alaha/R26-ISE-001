@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
 import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
+import { useAppStore } from "@/app/context/AppStoreContext";
 
 type Measurement = {
   shoulder_width?: number;
@@ -18,6 +19,7 @@ type Measurement = {
 
 export default function SizePage() {
   const router = useRouter();
+  const { setBodyMeasurements } = useAppStore();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
@@ -77,6 +79,16 @@ export default function SizePage() {
 
       setResultImage(data.annotated_image);
       setMeasurements(data.measurements || []);
+
+      const firstMeasurement = data.measurements?.[0];
+      if (firstMeasurement?.shoulder_cm && firstMeasurement?.hip_cm) {
+        setBodyMeasurements({
+          shoulderCm: firstMeasurement.shoulder_cm,
+          hipCm: firstMeasurement.hip_cm,
+          heightCm: Number(height),
+          gender,
+        });
+      }
 
       if (!data.measurements || data.measurements.length === 0) {
         setMessage("Prediction completed but no measurement data was returned.");
@@ -476,7 +488,7 @@ export default function SizePage() {
 
         <div className="mt-8 flex justify-center">
           <Button
-            onClick={() => router.push("/results")}
+            onClick={() => router.push("/health-tips")}
             className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-colors hover:bg-[#333]"
             style={{ ...SANS, fontWeight: 400 }}
           >
