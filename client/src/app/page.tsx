@@ -38,6 +38,16 @@ export default function HomePage() {
           >
             ANALYZER
           </button>
+
+          {/* Clothing Matcher */}
+          <button
+          type="button"
+          onClick={() => router.push("/cvd-matcher")}
+          className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
+          style={{ ...SANS, fontWeight: 400 }}
+                  >
+            CLOTHING MATCHER
+          </button>
           <button
             type="button"
             onClick={() => router.push("/input")}
