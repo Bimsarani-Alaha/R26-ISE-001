@@ -1,10 +1,10 @@
 "use client";
 
-import { ImagePlus, ChevronDown } from "lucide-react";
+import { ImagePlus, ChevronDown, UploadCloud } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
-
+import defaultPreviewImage from "./images/ColourTab1.png";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/";
 
@@ -107,7 +107,6 @@ export function ColorTab() {
     setLoading(true);
     setResult(null);
     setError(null);
-    setShowSubColors(false);
 
     try {
       const formData = new FormData();
@@ -133,10 +132,7 @@ export function ColorTab() {
     ? [...result.colors].sort((a, b) => b.percentage - a.percentage)
     : [];
 
-  // Main colours drive the headline breakdown; sub colours (flagged by
-  // the backend as being under the sub-colour threshold) are tucked
-  // away behind the expandable control below instead of being shown
-  // as one of the garment's "main" colours.
+
   const mainColors = sortedColors.filter((c) => !c.is_sub_color);
   const subColors = sortedColors.filter((c) => c.is_sub_color);
 
@@ -146,64 +142,102 @@ export function ColorTab() {
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* CONTROLS BAR */}
-      <div className="flex flex-wrap items-end gap-5 border-b border-[#e8e8e8] p-6 md:p-8">
-        <div className="min-w-[240px] flex-1">
-          <p className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
-            PHOTO
-          </p>
-          <label
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`flex cursor-pointer items-center gap-3 border border-dashed px-4 py-3 transition ${
-              isDragging
-                ? "border-[#111] bg-[#f0f0f0]"
-                : "border-[#d7d7d7] hover:border-[#111] hover:bg-[#f5f5f5]"
-            }`}
-          >
-            <ImagePlus className="h-4 w-4 flex-shrink-0 text-[#777]" />
-            <span
-              className="truncate text-sm text-[#111]"
-              style={{ ...SANS, fontWeight: 400 }}
-            >
-              {file
-                ? file.name
-                : isDragging
-                ? "Drop the photo here"
-                : "Select a photo to analyze, or drag & drop it here"}
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              className="hidden"
-            />
-          </label>
+      
+      <div className="grid grid-cols-1 items-stretch gap-6 border-b border-[#e8e8e8] p-6 md:grid-cols-2 md:p-8">
+        
+        <div className="flex h-full min-h-[280px] items-center justify-center border border-[#e8e8e8] bg-[#fafafa] p-4">
+          <img
+            src={defaultPreviewImage.src}
+            alt="Color analyzer"
+            className="max-h-[420px] w-full object-contain"
+          />
         </div>
 
-        <label
-          className="flex items-center gap-2.5 pb-3.5 text-xs text-[#666]"
-          style={SANS}
-        >
-          <input
-            type="checkbox"
-            checked={hasPerson}
-            onChange={(e) => setHasPerson(e.target.checked)}
-            className="accent-[#111]"
-          />
-          Person is wearing the shirt (excludes skin tone)
-        </label>
+        
+        <div className="flex h-full min-h-[280px] flex-col justify-between border border-[#e8e8e8] bg-white p-6">
+          <div>
+            <p className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
+              OPTIONS
+            </p>
+            <p className="mb-4 text-sm leading-7 text-[#666]" style={SANS}>
+              Upload a clear photo of the garment — drag &amp; drop it below,
+              or click to browse. Once you&apos;re ready, hit Analyze Colors
+              to get a full colour breakdown of the cloth.
+            </p>
 
-        <Button
-          type="submit"
-          disabled={loading || !file}
-          className="rounded-none border border-[#111] bg-[#111] px-8 py-2.5 text-[11px] tracking-[0.2em] text-white transition-all hover:bg-[#222] disabled:border-[#ddd] disabled:bg-[#ddd] disabled:text-[#999]"
-          style={SANS}
-        >
-          {loading ? "ANALYZING…" : "ANALYZE COLORS"}
-        </Button>
+            <label
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex min-h-[120px] w-full cursor-pointer flex-col items-center justify-center gap-2 border border-dashed px-4 py-6 text-center transition ${
+                isDragging
+                  ? "border-[#111] bg-[#f0f0f0]"
+                  : "border-[#d7d7d7] hover:border-[#111]"
+              }`}
+            >
+              {isDragging || !file ? (
+                <ImagePlus className="h-6 w-6 text-[#777]" />
+              ) : (
+                <UploadCloud className="h-6 w-6 text-[#777]" />
+              )}
+              <span
+                className="max-w-full truncate text-sm text-[#111]"
+                style={{ ...SANS, fontWeight: 400 }}
+              >
+                {isDragging
+                  ? "Drop the photo here"
+                  : file
+                  ? "Drag & drop or click to replace"
+                  : "Select a photo to analyze, or drag & drop it here"}
+              </span>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFile}
+                className="hidden"
+              />
+            </label>
+
+            {file && (
+              <div className="mt-4 flex items-center gap-3">
+                <img
+                  src={preview ?? undefined}
+                  alt="Selected preview"
+                  className="h-14 w-14 flex-shrink-0 border border-[#e8e8e8] object-cover"
+                />
+                <span className="truncate text-xs text-[#888]" style={SANS}>
+                  {file.name}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <label
+              className="flex items-center gap-2.5 text-xs text-[#666]"
+              style={SANS}
+            >
+              <input
+                type="checkbox"
+                checked={hasPerson}
+                onChange={(e) => setHasPerson(e.target.checked)}
+                className="accent-[#111]"
+              />
+              Person is wearing the shirt (excludes skin tone)
+            </label>
+
+            <Button
+              type="submit"
+              disabled={loading || !file}
+              className="rounded-none border border-[#111] bg-[#111] px-8 py-2.5 text-[11px] tracking-[0.2em] text-white transition-all hover:bg-[#222] disabled:border-[#ddd] disabled:bg-[#ddd] disabled:text-[#999]"
+              style={SANS}
+            >
+              {loading ? "ANALYZING…" : "ANALYZE COLORS"}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -215,29 +249,9 @@ export function ColorTab() {
         </p>
       )}
 
-      {/* PREVIEW / RESULTS */}
-      <div className="bg-[#fafafa] p-6 md:p-8">
-        {!result ? (
-          preview ? (
-            <div className="mx-auto max-w-2xl border border-[#e8e8e8] bg-white p-4">
-              <img
-                src={preview}
-                alt="Preview"
-                className="mx-auto max-h-[520px] w-full object-contain"
-              />
-            </div>
-          ) : (
-            <div
-              className="flex min-h-80 flex-col items-center justify-center gap-3 text-center text-[#999]"
-              style={SANS}
-            >
-              <div className="h-1.5 w-1.5 bg-[#111]" />
-              <p className="text-sm">
-                Results will appear here once you analyze a photo.
-              </p>
-            </div>
-          )
-        ) : (
+      {/* RESULTS: full width, below both boxes */}
+      {result && (
+        <div className="w-full bg-[#fafafa] p-6 md:p-8">
           <div className="grid gap-8 md:grid-cols-[0.9fr_1.1fr] items-start">
             {/* Photo */}
             <div className="border border-[#e8e8e8] bg-white p-4">
@@ -389,8 +403,8 @@ export function ColorTab() {
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </form>
   );
 }
