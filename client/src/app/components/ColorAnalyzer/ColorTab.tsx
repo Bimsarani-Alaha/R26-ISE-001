@@ -1,7 +1,7 @@
 "use client";
 
-import { ImagePlus } from "lucide-react";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { ImagePlus, ChevronDown } from "lucide-react";
+import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
 
@@ -10,14 +10,28 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/";
 
 const API_URL = `${API_BASE.replace(/\/$/, "")}/coloranalyzer`;
 
+interface ColorEntry {
+  name: string;
+  rgb: number[];
+  percentage: number;
+  is_sub_color?: boolean;
+}
+
 interface ColorResult {
   success: boolean;
-  colors?: Array<{ name: string; rgb: number[]; percentage: number }>;
+  colors?: ColorEntry[];
   image_preview?: string;
   base_color?: string;
   base_color_confidence?: number;
+  color_type?: "single" | "dual" | "multi" | string;
   detail?: string;
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  single: "Single Color T-Shirt",
+  dual: "Dual Color T-Shirt",
+  multi: "Multi Color T-Shirt",
+};
 
 function rgbToCss(rgb: number[]): string {
   return Array.isArray(rgb) && rgb.length === 3
@@ -36,14 +50,51 @@ export function ColorTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPerson, setHasPerson] = useState(false);
+  const [showSubColors, setShowSubColors] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+  const applyFile = (f: File | null | undefined) => {
     if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
+    }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+    setShowSubColors(false);
+  };
+
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    applyFile(f);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragEnter = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    applyFile(f);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -56,6 +107,7 @@ export function ColorTab() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setShowSubColors(false);
 
     try {
       const formData = new FormData();
@@ -81,6 +133,17 @@ export function ColorTab() {
     ? [...result.colors].sort((a, b) => b.percentage - a.percentage)
     : [];
 
+  // Main colours drive the headline breakdown; sub colours (flagged by
+  // the backend as being under the sub-colour threshold) are tucked
+  // away behind the expandable control below instead of being shown
+  // as one of the garment's "main" colours.
+  const mainColors = sortedColors.filter((c) => !c.is_sub_color);
+  const subColors = sortedColors.filter((c) => c.is_sub_color);
+
+  const categoryLabel = result?.color_type
+    ? CATEGORY_LABELS[result.color_type] ?? null
+    : null;
+
   return (
     <form onSubmit={handleSubmit}>
       {/* CONTROLS BAR */}
@@ -89,13 +152,27 @@ export function ColorTab() {
           <p className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
             PHOTO
           </p>
-          <label className="flex cursor-pointer items-center gap-3 border border-dashed border-[#d7d7d7] px-4 py-3 transition hover:border-[#111] hover:bg-[#f5f5f5]">
+          <label
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer items-center gap-3 border border-dashed px-4 py-3 transition ${
+              isDragging
+                ? "border-[#111] bg-[#f0f0f0]"
+                : "border-[#d7d7d7] hover:border-[#111] hover:bg-[#f5f5f5]"
+            }`}
+          >
             <ImagePlus className="h-4 w-4 flex-shrink-0 text-[#777]" />
             <span
               className="truncate text-sm text-[#111]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              {file ? file.name : "Select a photo to analyze"}
+              {file
+                ? file.name
+                : isDragging
+                ? "Drop the photo here"
+                : "Select a photo to analyze, or drag & drop it here"}
             </span>
             <input
               type="file"
@@ -193,25 +270,35 @@ export function ColorTab() {
 
             {/* Breakdown */}
             <div className="border border-[#e8e8e8] bg-white p-6 md:p-8">
-              <p
-                className="mb-1 text-[10px] tracking-[0.25em] text-[#aaa]"
-                style={SANS}
-              >
-                COLOR BREAKDOWN
-              </p>
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <p
+                  className="text-[10px] tracking-[0.25em] text-[#aaa]"
+                  style={SANS}
+                >
+                  COLOR BREAKDOWN
+                </p>
+                {categoryLabel && (
+                  <span
+                    className="border border-[#111] px-3 py-1 text-[10px] tracking-[0.15em] text-[#111]"
+                    style={SANS}
+                  >
+                    {categoryLabel.toUpperCase()}
+                  </span>
+                )}
+              </div>
 
-              {sortedColors.length === 0 ? (
+              {mainColors.length === 0 ? (
                 <p className="mt-4 text-sm text-[#888]" style={SANS}>
                   No dominant colours detected — try a clearer, closer photo.
                 </p>
               ) : (
                 <>
                   <p className="mb-6 text-xs text-[#888]" style={SANS}>
-                    {sortedColors.length}{" "}
-                    {sortedColors.length === 1 ? "colour" : "colours"} detected
+                    {mainColors.length}{" "}
+                    {mainColors.length === 1 ? "colour" : "colours"} detected
                   </p>
                   <div className="space-y-6">
-                    {sortedColors.map((c, i) => (
+                    {mainColors.map((c, i) => (
                       <div key={`${c.name}-${i}`} className="flex items-center gap-5">
                         <span className="w-5 text-[11px] text-[#bbb]" style={SANS}>
                           {pad2(i + 1)}
@@ -245,6 +332,59 @@ export function ColorTab() {
                       </div>
                     ))}
                   </div>
+
+                  {subColors.length > 0 && (
+                    <div className="mt-6 border-t border-[#eee] pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowSubColors((v) => !v)}
+                        className="flex w-full items-center justify-between text-[11px] tracking-[0.15em] text-[#888] transition-colors hover:text-[#111]"
+                        style={SANS}
+                      >
+                        <span>
+                          {showSubColors ? "HIDE" : "SHOW"} {subColors.length}{" "}
+                          SUB {subColors.length === 1 ? "COLOUR" : "COLOURS"}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${
+                            showSubColors ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {showSubColors && (
+                        <div className="mt-4 space-y-4">
+                          {subColors.map((c, i) => (
+                            <div
+                              key={`sub-${c.name}-${i}`}
+                              className="flex items-center gap-4 opacity-70"
+                            >
+                              <span
+                                className="h-7 w-7 flex-shrink-0 border border-[#e5e5e5]"
+                                style={{ background: rgbToCss(c.rgb) }}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span
+                                    className="truncate text-sm text-[#555]"
+                                    style={{ ...SERIF, fontWeight: 500 }}
+                                  >
+                                    {c.name}
+                                  </span>
+                                  <span
+                                    className="flex-shrink-0 text-[11px] text-[#999]"
+                                    style={SANS}
+                                  >
+                                    {c.percentage.toFixed(1)}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>

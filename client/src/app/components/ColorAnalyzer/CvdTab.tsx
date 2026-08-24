@@ -1,7 +1,7 @@
 "use client";
 
 import { ImagePlus } from "lucide-react";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
 
@@ -28,14 +28,49 @@ export function CvdTab() {
   const [result, setResult] = useState<CvdResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+  const applyFile = (f: File | null | undefined) => {
     if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
+    }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+  };
+
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    applyFile(f);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragEnter = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    applyFile(f);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -77,13 +112,27 @@ export function CvdTab() {
           <p className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
             PHOTO
           </p>
-          <label className="flex cursor-pointer items-center gap-3 border border-dashed border-[#d7d7d7] px-4 py-3 transition hover:border-[#111] hover:bg-[#f5f5f5]">
+          <label
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer items-center gap-3 border border-dashed px-4 py-3 transition ${
+              isDragging
+                ? "border-[#111] bg-[#f0f0f0]"
+                : "border-[#d7d7d7] hover:border-[#111] hover:bg-[#f5f5f5]"
+            }`}
+          >
             <ImagePlus className="h-4 w-4 flex-shrink-0 text-[#777]" />
             <span
               className="truncate text-sm text-[#111]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              {file ? file.name : "Select a photo to simulate"}
+              {file
+                ? file.name
+                : isDragging
+                ? "Drop the photo here"
+                : "Select a photo to simulate, or drag & drop it here"}
             </span>
             <input
               type="file"
