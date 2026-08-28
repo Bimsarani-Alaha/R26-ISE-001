@@ -4,6 +4,7 @@ import { ImagePlus } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
+import { CvdColourImpact, CVD_LABELS } from "./CvdColourImpact";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/";
 const API_URL = `${API_BASE.replace(/\/$/, "")}/coloranalyzer`;
@@ -15,11 +16,44 @@ interface CvdResult {
   detail?: string;
 }
 
-const CVD_LABELS: Record<string, string> = {
-  protanopia: "Protanopia — red-blind",
-  deuteranopia: "Deuteranopia — green-blind",
-  tritanopia: "Tritanopia — blue-blind",
-};
+export interface ColorEntry {
+  name: string;
+  rgb: number[];
+  percentage: number;
+  is_sub_color?: boolean;
+}
+
+export interface ColorResult {
+  success: boolean;
+  colors?: ColorEntry[];
+  base_color?: string;
+  base_color_confidence?: number;
+  color_type?: "single" | "dual" | "multi" | string;
+  detail?: string;
+}
+
+function base64ToFile(base64: string, filename: string, mime = "image/jpeg"): File {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new File([byteArray], filename, { type: mime });
+}
+
+async function analyzeColors(imageFile: File): Promise<ColorResult> {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+  formData.append("has_person", "false");
+  const res = await fetch(`${API_URL}/analyze`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.detail || "Color analysis failed");
+  return data as ColorResult;
+}
 
 export function CvdTab() {
   const [file, setFile] = useState<File | null>(null);
@@ -29,6 +63,11 @@ export function CvdTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [originalAnalysis, setOriginalAnalysis] = useState<ColorResult | null>(null);
+  const [transformedAnalysis, setTransformedAnalysis] = useState<ColorResult | null>(null);
 
   const applyFile = (f: File | null | undefined) => {
     if (!f) return;
@@ -40,6 +79,9 @@ export function CvdTab() {
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+    setOriginalAnalysis(null);
+    setTransformedAnalysis(null);
+    setAnalysisError(null);
   };
 
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +125,9 @@ export function CvdTab() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setOriginalAnalysis(null);
+    setTransformedAnalysis(null);
+    setAnalysisError(null);
 
     try {
       const formData = new FormData();
@@ -97,9 +142,26 @@ export function CvdTab() {
       const data = await res.json();
       if (!data.success) throw new Error(data.detail || "CVD generation failed");
       setResult(data);
+      setLoading(false);
+
+      setAnalyzing(true);
+      try {
+        const cvdFile = base64ToFile(data.cvd_image, `cvd-${cvdType}.jpg`);
+        const [origColors, transColors] = await Promise.all([
+          analyzeColors(file),
+          analyzeColors(cvdFile),
+        ]);
+        setOriginalAnalysis(origColors);
+        setTransformedAnalysis(transColors);
+      } catch (analysisErr) {
+        setAnalysisError(
+          analysisErr instanceof Error ? analysisErr.message : "Colour impact analysis failed"
+        );
+      } finally {
+        setAnalyzing(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
-    } finally {
       setLoading(false);
     }
   };
@@ -241,6 +303,17 @@ export function CvdTab() {
           </div>
         )}
       </div>
+
+      {/* COLOUR VISION IMPACT — logic + UI live in CvdColourImpact.tsx */}
+      {result && (
+        <CvdColourImpact
+          cvdType={cvdType}
+          analyzing={analyzing}
+          analysisError={analysisError}
+          originalAnalysis={originalAnalysis}
+          transformedAnalysis={transformedAnalysis}
+        />
+      )}
     </form>
   );
 }
