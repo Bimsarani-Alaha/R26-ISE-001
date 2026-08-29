@@ -21,7 +21,8 @@ export interface RecommendationResponse {
 }
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:8000";
 
 const IMAGE_BY_CATEGORY: Record<string, string> = {
   Top: "https://images.unsplash.com/photo-1523398002811-999ca8dec234?auto=format&fit=crop&w=1080&q=80",

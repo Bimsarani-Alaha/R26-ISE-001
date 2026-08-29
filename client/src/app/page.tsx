@@ -29,6 +29,25 @@ export default function HomePage() {
           <StyleAiWordmark className="text-2xl" />
         </div>
         <div className="flex items-center gap-6">
+          {/* NEW: Color Analyzer button in navigation */}
+          <button
+            type="button"
+            onClick={() => router.push("/color-analyzer")}
+            className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
+            style={{ ...SANS, fontWeight: 400 }}
+          >
+            ANALYZER
+          </button>
+
+          {/* Clothing Matcher */}
+          <button
+          type="button"
+          onClick={() => router.push("/cvd-matcher")}
+          className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
+          style={{ ...SANS, fontWeight: 400 }}
+                  >
+            CLOTHING MATCHER
+          </button>
           <button
             type="button"
             onClick={() => router.push("/input")}
@@ -98,40 +117,45 @@ export default function HomePage() {
                 START NOW
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </motion.button>
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.8 }}
-                onClick={() => router.push("/size")}
-                className="flex items-center gap-2 border border-white/80 text-white px-7 py-3 text-xs tracking-[0.2em] hover:bg-white hover:text-[#111] transition-all duration-300"
-                style={{ ...SANS, fontWeight: 400 }}
-              >
-                POSE DETECTION
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </motion.button>
             </div>
           </div>
         </motion.div>
       </div>
 
-      {/* Feature strip */}
+      {/* Feature strip - UPDATED with COLOR ANALYZER */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.9 }}
         className="border-t border-[#e8e8e8]"
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
+        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
           {[
-            { icon: "◯", label: "AI OUTFIT CURATION" },
-            { icon: "◈", label: "OCCASION MATCHING" },
-            { icon: "◻", label: "STYLE INTELLIGENCE" },
-            { icon: "⊹", label: "PERSONALIZED PICKS" },
+            {
+              icon: "◻",
+              label: "SIZE INTELLIGENCE",
+              action: () => router.push("/size"),
+              isClickable: true,
+            },
+            { icon: "◯", label: "AI OUTFIT CURATION", action: null },
+            { icon: "◈", label: "OCCASION MATCHING", action: null },
+            { icon: "⊹", label: "PERSONALIZED PICKS", action: null },
+            // NEW: Color Analyzer button in feature strip
+            { 
+              icon: "●", 
+              label: "COLOR ANALYZER", 
+              action: () => router.push("/color-analyzer"),
+              isClickable: true 
+            },
           ].map((feat) => (
             <div
               key={feat.label}
-              className="flex flex-col items-center gap-3 py-8 px-6 hover:bg-[#fafafa] transition-colors cursor-default"
+              onClick={feat.action || undefined}
+              className={`flex flex-col items-center gap-3 py-8 px-6 transition-colors ${
+                feat.isClickable 
+                  ? "cursor-pointer hover:bg-[#f5f0eb]" 
+                  : "cursor-default hover:bg-[#fafafa]"
+              }`}
             >
               <span className="text-lg text-[#999]">{feat.icon}</span>
               <span
@@ -156,22 +180,27 @@ export default function HomePage() {
         >
           HOW IT WORKS
         </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 max-w-3xl mx-auto border border-[#e5e5e5]">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-0 max-w-5xl mx-auto border border-[#e5e5e5]">
           {[
             {
               step: "01",
-              title: "DESCRIBE",
-              desc: "Tell us your occasion, style, and preferences in your own words.",
+              title: "SIZE PREDICTION AI",
+              desc: "Upload a full-body image and enter your height. Our AI predicts your clothing size , then provides personalized body appearance and wellness guidance based on your measurements.",
             },
             {
               step: "02",
-              title: "ANALYSE",
-              desc: "Our AI reads your needs and matches them to curated outfit options.",
+              title: "OUTFIT RECOMMENDATION AI",
+              desc: "Enter or filter your clothing requirements, and our AI recommends suitable outfits based on your preferences and predicted clothing size. Click on an outfit to receive personalized styling tips.",
             },
             {
               step: "03",
-              title: "DISCOVER",
-              desc: "Browse personalized recommendations crafted just for you.",
+              title: "CVD MATCHER",
+              desc: "Select a specific type of color vision deficiency and explore how different colors may appear to people with that condition, helping you understand color accessibility in clothing choices.",
+            },
+            {
+              step: "04",
+              title: "COLOR ANALYZER",
+              desc: "Upload an outfit image and our AI analyzes the top and bottom colors to provide a matching score, helping you check whether the colors work well together.",
             },
           ].map((item, i) => (
             <motion.div
