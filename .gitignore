@@ -209,6 +209,10 @@ tempCodeRunnerFile.py
 # Style Recommendation Engine (local only)
 styleRecommendationEngine/
 
+# Docs and Superpowers
+docs/
+.superpowers/
+
 # PyPI configuration file
 .pypirc
 
