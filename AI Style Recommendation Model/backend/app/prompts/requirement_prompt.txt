@@ -1,0 +1,44 @@
+Extract fashion requirements as JSON from the customer request below.
+
+Schema: {"occasion": null, "preferred_colors": [], "article_types": [], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
+VALID ARTICLE TYPES (use ONLY these exact values):
+Saree, Dress, Kurta, Kurti, Lehenga, Lehenga Choli Set, Top, Blouse, Jeans, Pants, Trousers, Skirt, Jumpsuit, Suit Set, Salwar Kameez, Sharara Set, Anarkali Suit, Co-ord Set, Cardigan, Jacket, Shorts, Romper, Palazzo, Crop Top, Maxi Dress, Midi Dress, Mini Dress
+
+VALID COLORS:
+Red, Blue, Green, Yellow, Pink, Purple, Orange, Black, White, Grey, Brown, Navy Blue, Light Blue, Teal Blue, Maroon, Beige, Cream, Gold, Silver, Rose Gold, Peach, Lavender, Magenta, Coral, Olive, Teal, Turquoise, Navy, Burgundy, Charcoal, Ivory
+
+VALID OCCASIONS:
+Wedding, Party, Formal, Casual, Festival, Office, Travel, Beach, Date Night, Interview, Sports
+
+VALID PATTERNS:
+Floral, Solid, Striped, Polka Dot, Geometric, Paisley, Abstract, Printed, Embroidered, Woven, Sequin, Checkered, Plaid, Animal Print, Botanical, Block Print, Tie Dye
+
+VALID MATERIALS:
+Cotton, Silk, Polyester, Chiffon, Georgette, Rayon, Denim, Leather, Velvet, Crepe, Net, Organza, Linen, Jersey, Satin, Tulle, Wool, Cashmere, Silk Blend, Cotton Blend, Art Silk, Banarasi Silk
+
+VALID STYLES:
+Traditional, Contemporary, Ethnic, Western, Formal, Casual, Streetwear, Bohemian, Minimalist, Classic, Vintage, Modern, Elegant, Trendy, Fusion, Indo-Western
+
+VALID NECK TYPES:
+Round Neck, V-Neck, Sweetheart Neck, Boat Neck, Square Neck, Scoop Neck, High Neck, Collar Neck, Mandarin Collar, Halter Neck, Off-Shoulder, One Shoulder, Cowl Neck, Turtleneck, Mock Neck, Keyhole Neck, Spaghetti Strap, Strapless, Wrap Neck, Shirt Collar, Peter Pan Collar, Choker Neck, Ruffle Neck, Deep V-Neck, Notch Neck
+
+VALID SLEEVE TYPES:
+Sleeveless, Short Sleeve, Half Sleeve, Three-Quarter Sleeve, Full Sleeve, Cap Sleeve, Puff Sleeve, Bell Sleeve, Flutter Sleeve, Kimono Sleeve, Raglan Sleeve, Bishop Sleeve, Lantern Sleeve, Cold Shoulder, Strap Sleeve
+
+RULES:
+1. For article_types: If customer says "saree", use "Saree". If they say "dress", use "Dress". Match EXACTLY to valid types above.
+2. For preferred_colors: Extract the EXACT color mentioned. "blue" = "Blue", "navy blue" = "Navy Blue", "light blue" = "Light Blue".
+3. For occasion: If customer says "wedding", use "Wedding". If "party", use "Party". If not mentioned, set to null.
+4. Only extract explicitly stated requirements. Do NOT infer or guess.
+5. price_preference: {"max": N} or {"min": N} or null
+6. Return ONLY valid JSON, no other text.
+
+EXAMPLE:
+Customer request: "i need a blue saree for wedding"
+Response: {"occasion": ["Wedding"], "preferred_colors": ["Blue"], "article_types": ["Saree"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
+Customer request: "red cotton kurta for office"
+Response: {"occasion": ["Formal"], "preferred_colors": ["Red"], "article_types": ["Kurta"], "style_preferences": [], "materials": ["Cotton"], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
+Customer request: "i need a blue saree for wedding"
