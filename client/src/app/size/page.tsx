@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowUpRight, ImagePlus, Sparkles } from "lucide-react";
+import { ArrowUpRight, Camera, ImagePlus, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
+import { useAppStore } from "@/app/context/AppStoreContext";
 
 type Measurement = {
   shoulder_width?: number;
@@ -13,10 +14,12 @@ type Measurement = {
   height?: number;
   shoulder_cm?: number;
   hip_cm?: number;
+  size?: string;
 };
 
 export default function SizePage() {
   const router = useRouter();
+  const { setBodyMeasurements } = useAppStore();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
@@ -24,17 +27,97 @@ export default function SizePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [height, setHeight] = useState("");
+  const [gender, setGender] = useState("Women");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraReady(false);
+    setCameraOpen(false);
+  };
+
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraOpen]);
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
+  const openCamera = async () => {
+    if (!window.isSecureContext) {
+      setMessage("Camera access requires HTTPS. Open this app at http://localhost:3000 or use an HTTPS address.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage("Camera access is not supported by this browser.");
+      return;
+    }
+
+    try {
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      setMessage("");
+      setCameraReady(false);
+      setCameraOpen(true);
+    } catch {
+      setMessage("Unable to access the camera. Please allow camera permission and try again.");
+    }
+  };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
+    handleFile(f);
+  };
+
+  const handleFile = (f: File) => {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResultImage("");
     setMeasurements([]);
     setMessage("");
     setHeight("");
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video?.videoWidth || !video.videoHeight) {
+      setMessage("The camera is not ready yet. Please wait a moment and try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setMessage("Unable to capture an image from the camera.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setMessage("Unable to capture an image from the camera.");
+        return;
+      }
+      handleFile(new File([blob], "camera-capture.jpg", { type: "image/jpeg" }));
+      stopCamera();
+    }, "image/jpeg", 0.92);
   };
 
   const handleUpload = async () => {
@@ -48,9 +131,15 @@ export default function SizePage() {
       return;
     }
 
+    if (!gender) {
+      setMessage("Please select your gender for size estimation.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("height", height);
+    formData.append("gender", gender);
 
     setLoading(true);
     setMessage("");
@@ -69,6 +158,17 @@ export default function SizePage() {
 
       setResultImage(data.annotated_image);
       setMeasurements(data.measurements || []);
+
+      const firstMeasurement = data.measurements?.[0];
+      if (firstMeasurement?.shoulder_cm && firstMeasurement?.hip_cm) {
+        setBodyMeasurements({
+          shoulderCm: firstMeasurement.shoulder_cm,
+          hipCm: firstMeasurement.hip_cm,
+          heightCm: Number(height),
+          gender,
+          clothingSize: firstMeasurement.size ?? "unspecified",
+        });
+      }
 
       if (!data.measurements || data.measurements.length === 0) {
         setMessage("Prediction completed but no measurement data was returned.");
@@ -129,14 +229,14 @@ export default function SizePage() {
       </nav>
 
       <main className="px-8 py-10 md:px-16 md:py-16">
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="overflow-hidden rounded-none border border-[#e8e8e8] bg-[#f7f4ee] shadow-[0_20px_80px_-30px_rgba(17,17,17,0.25)]"
-        >
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="relative min-h-105 overflow-hidden rounded-none">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="overflow-hidden rounded-none border border-[#e8e8e8] bg-[#f7f4ee] shadow-[0_20px_80px_-30px_rgba(17,17,17,0.25)]"
+          >
+            <div className="relative h-full min-h-105 overflow-hidden rounded-none">
               <img
                 src="/sizeHome.jpg"
                 alt="Size measurement hero image"
@@ -145,7 +245,6 @@ export default function SizePage() {
               <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/20 to-transparent" />
 
               <div className="relative flex h-full flex-col justify-between p-8 sm:p-10 lg:p-12">
-
                 <div className="max-w-xl">
                   <h1
                     className="text-4xl text-white sm:text-5xl lg:text-6xl"
@@ -153,7 +252,10 @@ export default function SizePage() {
                   >
                     POSE DETECTION
                   </h1>
-                  <p className="mt-4 max-w-lg text-sm leading-7 text-white/80 sm:text-base" style={SANS}>
+                  <p
+                    className="mt-4 max-w-lg text-sm leading-7 text-white/80 sm:text-base"
+                    style={SANS}
+                  >
                     Upload a full-body image, enter your real height, and receive refined measurements with the same calm, editorial experience as the rest of the platform.
                   </p>
                   <div className="mt-8 flex flex-wrap gap-3">
@@ -178,142 +280,25 @@ export default function SizePage() {
                 </div>
               </div>
             </div>
+          </motion.section>
 
-            <div className="flex flex-col justify-center bg-white p-8 sm:p-10 lg:p-12">
-              <div className="mb-4 flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#777]" style={SANS}>
-                START YOUR ANALYSIS
-              </div>
-
-              <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
-                <label className="flex cursor-pointer flex-col items-center justify-center border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center transition hover:border-[#111] hover:bg-[#f5f5f5]">
-                  <ImagePlus className="h-6 w-6 text-[#777]" />
-                  <span className="mt-3 text-sm font-medium text-[#111]">
-                    Select Image
-                  </span>
-                  <span className="mt-2 text-xs text-[#777]">
-                    PNG, JPG, WEBP, and more
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleChange}
-                    className="hidden"
-                  />
-                </label>
-
-                {file && (
-                  <div className="mt-3 text-xs uppercase tracking-[0.2em] text-[#666]">
-                    {file.name}
-                  </div>
-                )}
-
-                <div className="mt-5 space-y-2">
-                  <label htmlFor="height" className="text-sm font-medium text-[#111]">
-                    Height (cm)
-                  </label>
-                  <input
-                    id="height"
-                    type="number"
-                    min="1"
-                    step="0.1"
-                    placeholder="e.g. 172.5"
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                    className="w-full rounded-none border border-[#d7d7d7] bg-white px-3 py-2.5 text-sm text-[#111] outline-none ring-0 focus:border-[#111]"
-                  />
-                </div>
-
-                <Button
-                  className="mt-5 w-full rounded-none border border-[#111] bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-all hover:bg-[#222]"
-                  onClick={handleUpload}
-                  disabled={loading}
-                  style={{ ...SANS, fontWeight: 400 }}
-                >
-                  {loading ? "PROCESSING..." : "PREDICT IMAGE"}
-                </Button>
-
-                {message && (
-                  <p className="mt-4 text-sm leading-6 text-[#666]">{message}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.4 }}
-              className="border border-[#e8e8e8] bg-white p-8"
-            >
-              <h3 className="text-xl tracking-[0.2em] text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>
-                MEASUREMENTS
-              </h3>
-
-              {measurements.length > 0 ? (
-                <div className="mt-6 space-y-4">
-                  {measurements.map((m, i) => (
-                    <div key={`${m.shoulder_width ?? "n"}-${i}`} className="grid gap-4 border border-[#e5e5e5] bg-[#fafafa] p-5 md:grid-cols-[0.95fr_0.95fr]">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.25em] text-[#999]" style={SANS}>
-                          PIXELS
-                        </div>
-                        <div className="mt-4 text-sm text-[#777]" style={SANS}>Shoulder</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.shoulder_width?.toFixed(1) ?? "N/A"}
-                        </div>
-                        <div className="mt-3 text-sm text-[#777]" style={SANS}>Hip</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.hip_width?.toFixed(1) ?? "N/A"}
-                        </div>
-                        <div className="mt-3 text-sm text-[#777]" style={SANS}>Height</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.height?.toFixed(1) ?? "N/A"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.25em] text-[#999]" style={SANS}>
-                          CENTIMETERS
-                        </div>
-                        <div className="mt-4 text-sm text-[#777]" style={SANS}>Shoulder</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.shoulder_cm?.toFixed(2) ?? "N/A"}
-                        </div>
-                        <div className="mt-3 text-sm text-[#777]" style={SANS}>Hip</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.hip_cm?.toFixed(2) ?? "N/A"}
-                        </div>
-                        <div className="mt-3 text-sm text-[#777]" style={SANS}>Height</div>
-                        <div className="text-base font-semibold text-[#111]">
-                          {m.height ? "--" : "N/A"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-6 border border-dashed border-[#d7d7d7] bg-[#fafafa] p-6 text-sm leading-7 text-[#666]" style={SANS}>
-                  Upload an image and run the predictor to reveal the measurements panel here.
-                </div>
-              )}
-            </motion.div>
-
-        <section className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="border border-[#e8e8e8] bg-[#fafafa] p-8"
+            className="border border-[#e8e8e8] bg-[#fafafa] p-8 sm:p-10 lg:p-12"
           >
-            <h2 className="text-2xl tracking-[0.2em] text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>
+            <h2
+              className="text-2xl tracking-[0.2em] text-[#111]"
+              style={{ ...SERIF, fontWeight: 400 }}
+            >
               HOW IT WORKS
             </h2>
             <div className="mt-6 space-y-4">
               {[
                 {
                   title: "01 · UPLOAD",
-                  desc: "Upload a clear full-body image. For more accurate size prediction, stand approximately 2 meters away from the camera while capturing the image",
+                  desc: <>Upload a clear full-body image. For more accurate size prediction, <strong className="bg-[#f4df70] px-1 font-bold text-[#111]">stand approximately 2 meters away from the camera</strong> while capturing the image.</>,
                 },
                 {
                   title: "02 · SCALE",
@@ -328,11 +313,20 @@ export default function SizePage() {
                   desc: "Based on your body measurements, the system recommends the most suitable torso clothing size (S, M, L, XL, etc.) for a better fit.",
                 },
               ].map((item) => (
-                <div key={item.title} className="border-b border-[#e5e5e5] pb-4 last:border-b-0 last:pb-0">
-                  <p className="text-[11px] tracking-[0.25em] text-[#aaa]" style={SANS}>
+                <div
+                  key={item.title}
+                  className="border-b border-[#e5e5e5] pb-4 last:border-b-0 last:pb-0"
+                >
+                  <p
+                    className="text-[11px] tracking-[0.25em] text-[#aaa]"
+                    style={SANS}
+                  >
                     {item.title}
                   </p>
-                  <p className="mt-2 text-sm leading-7 text-[#666]" style={SANS}>
+                  <p
+                    className="mt-2 text-sm leading-7 text-[#666]"
+                    style={SANS}
+                  >
                     {item.desc}
                   </p>
                 </div>
@@ -340,8 +334,244 @@ export default function SizePage() {
             </div>
           </motion.div>
 
-          
+          <div className="border border-[#e8e8e8] bg-white p-8 sm:p-10 lg:p-12">
+            <div
+              className="mb-4 flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#777]"
+              style={SANS}
+            >
+              START YOUR ANALYSIS
+            </div>
 
+            <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
+              {cameraOpen ? (
+                <div className="border border-dashed border-[#d7d7d7] bg-white p-3">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    onLoadedMetadata={() => setCameraReady(true)}
+                    className="max-h-80 w-full object-contain"
+                  />
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={capturePhoto}
+                      disabled={!cameraReady}
+                      className="flex-1 border border-[#111] bg-white px-4 py-2.5 text-sm font-medium text-[#111] transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:border-[#ddd] disabled:text-[#999]"
+                    >
+                      Capture Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="border border-[#d7d7d7] bg-white px-4 py-2.5 text-sm text-[#555] transition hover:border-[#111] hover:text-[#111]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 border border-dashed border-[#d7d7d7] bg-white px-4 py-3 text-center text-sm font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
+                >
+                  <Camera className="h-4 w-4 text-[#777]" />
+                  <span>Open Camera</span>
+                </button>
+              )}
+
+              {file && (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="mt-3 flex w-full items-center justify-center gap-2 border border-[#d7d7d7] bg-white px-3 py-2 text-xs font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
+                >
+                  <Camera className="h-3.5 w-3.5 text-[#777]" />
+                  Capture Photo Again
+                </button>
+              )}
+
+              <div className="my-4 flex items-center gap-3 text-[10px] tracking-[0.2em] text-[#999]" style={SANS}>
+                <span className="h-px flex-1 bg-[#e5e5e5]" />
+                OR SELECT AN IMAGE
+                <span className="h-px flex-1 bg-[#e5e5e5]" />
+              </div>
+
+              <label className="flex cursor-pointer flex-col items-center justify-center border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center transition hover:border-[#111] hover:bg-[#f5f5f5]">
+                <ImagePlus className="h-6 w-6 text-[#777]" />
+                <span className="mt-3 text-sm font-medium text-[#111]">
+                  Select Image
+                </span>
+                <span className="mt-2 text-xs text-[#777]">
+                  PNG, JPG, WEBP, and more
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleChange}
+                  className="hidden"
+                />
+              </label>
+
+              {file && (
+                <div className="mt-3 truncate text-xs uppercase tracking-[0.2em] text-[#666]">
+                  {file.name}
+                </div>
+              )}
+
+              <div className="mt-5 space-y-2">
+                <label
+                  htmlFor="height"
+                  className="text-sm font-medium text-[#111]"
+                >
+                  Height (cm)
+                </label>
+                <input
+                  id="height"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  placeholder="e.g. 172.5"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="w-full rounded-none border border-[#d7d7d7] bg-white px-3 py-2.5 text-sm text-[#111] outline-none ring-0 focus:border-[#111]"
+                />
+              </div>
+
+              <div className="mt-5">
+                <div className="text-sm font-medium text-[#111]">Gender</div>
+                <div className="mt-3 flex gap-3">
+                  {["Women", "Men"].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setGender(option)}
+                      className={`rounded-none border px-4 py-2 text-xs tracking-[0.12em] transition-all ${
+                        gender === option
+                          ? "bg-[#111] text-white border-[#111]"
+                          : "bg-white text-[#555] border-[#ddd] hover:border-[#999] hover:text-[#111]"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleUpload}
+                disabled={loading}
+                className="mt-6 w-full rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "PROCESSING..." : "PREDICT IMAGE"}
+              </button>
+
+              {message && (
+                <p
+                  className="mt-4 text-sm leading-6 text-[#666]"
+                  style={SANS}
+                >
+                  {message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
+            className="border border-[#e8e8e8] bg-white p-8"
+          >
+            <h3
+              className="text-xl tracking-[0.2em] text-[#111]"
+              style={{ ...SERIF, fontWeight: 400 }}
+            >
+              MEASUREMENTS
+            </h3>
+
+            {measurements.length > 0 ? (
+              <div className="mt-6 space-y-4">
+                {measurements.map((m, i) => (
+                  <div
+                    key={`${m.shoulder_width ?? "n"}-${i}`}
+                    className="space-y-4"
+                  >
+                    <div className="grid gap-4 border border-[#e5e5e5] bg-[#fafafa] p-5 md:grid-cols-[0.95fr_0.95fr]">
+                      <div>
+                        <div
+                          className="text-[10px] uppercase tracking-[0.25em] text-[#999]"
+                          style={SANS}
+                        >
+                          PIXELS
+                        </div>
+                        <div className="mt-4 text-sm text-[#777]" style={SANS}>
+                          Shoulder
+                        </div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.shoulder_width?.toFixed(1) ?? "N/A"}
+                        </div>
+                        <div className="mt-3 text-sm text-[#777]" style={SANS}>
+                          Hip
+                        </div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.hip_width?.toFixed(1) ?? "N/A"}
+                        </div>
+                        <div className="mt-3 text-sm text-[#777]" style={SANS}>
+                          Height
+                        </div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.height?.toFixed(1) ?? "N/A"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div
+                          className="text-[10px] uppercase tracking-[0.25em] text-[#999]"
+                          style={SANS}
+                        >
+                          CENTIMETERS
+                        </div>
+                        <div className="mt-4 text-sm text-[#777]" style={SANS}>
+                          Shoulder
+                        </div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.shoulder_cm?.toFixed(2) ?? "N/A"}
+                        </div>
+                        <div className="mt-3 text-sm text-[#777]" style={SANS}>
+                          Hip
+                        </div>
+                        <div className="text-base font-semibold text-[#111]">
+                          {m.hip_cm?.toFixed(2) ?? "N/A"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-[#ddd] bg-white px-5 py-4 text-center text-[#555]">
+                      <div className="text-[10px] tracking-[0.25em] text-[#555]" style={SANS}>
+                        RECOMMENDED SIZE
+                      </div>
+                      <div className="mt-1 text-3xl text-[#111]" style={{ ...SERIF, fontWeight: 500 }}>
+                        {m.size ?? "N/A"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="mt-6 border border-dashed border-[#d7d7d7] bg-[#fafafa] p-6 text-sm leading-7 text-[#666]"
+                style={SANS}
+              >
+                Upload an image and run the predictor to reveal the measurements panel here.
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        <section className="mt-10">
           <div className="space-y-6">
             {(preview || resultImage) && (
               <div className="grid gap-6 md:grid-cols-2">
@@ -350,15 +580,18 @@ export default function SizePage() {
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.2 }}
-                    className="border border-[#e8e8e8] bg-white p-5"
+                    className="border border-[#e8e8e8] bg-white p-4"
                   >
-                    <h3 className="text-lg tracking-[0.15em] text-[#111]" style={{ ...SERIF, fontWeight: 500 }}>
+                    <h3
+                      className="text-lg tracking-[0.15em] text-[#111]"
+                      style={{ ...SERIF, fontWeight: 500 }}
+                    >
                       ORIGINAL
                     </h3>
                     <img
                       src={preview}
                       alt="Original upload preview"
-                      className="mt-4 h-auto w-full object-contain"
+                      className="mt-3 max-h-114 h-auto w-full object-contain"
                     />
                   </motion.div>
                 )}
@@ -368,15 +601,18 @@ export default function SizePage() {
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.3 }}
-                    className="border border-[#e8e8e8] bg-white p-5"
+                    className="border border-[#e8e8e8] bg-white p-4"
                   >
-                    <h3 className="text-lg tracking-[0.15em] text-[#111]" style={{ ...SERIF, fontWeight: 500 }}>
+                    <h3
+                      className="text-lg tracking-[0.15em] text-[#111]"
+                      style={{ ...SERIF, fontWeight: 500 }}
+                    >
                       RESULT
                     </h3>
                     <img
                       src={resultImage}
                       alt="Annotated result"
-                      className="mt-4 h-auto w-full object-contain"
+                      className="mt-3 max-h-114 h-auto w-full object-contain"
                     />
                   </motion.div>
                 )}
@@ -384,6 +620,17 @@ export default function SizePage() {
             )}
           </div>
         </section>
+
+        <div className="mt-8 flex justify-center">
+          <Button
+            onClick={() => router.push("/health-tips")}
+            className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-colors hover:bg-[#333]"
+            style={{ ...SANS, fontWeight: 400 }}
+          >
+            BODY APPEARANCE GUIDE
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </main>
     </div>
   );

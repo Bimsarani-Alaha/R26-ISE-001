@@ -1,14 +1,17 @@
+import os
+import io
+import pickle
+import numpy as np
+import pandas as pd
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
-import numpy as np
 from skimage import color
 from skimage.color import deltaE_ciede2000
 from sklearn.cluster import KMeans
-from rembg import remove as remove_bg, new_session  
-import pickle
-import io
-import os
+from rembg import remove as remove_bg, new_session
+
 
 app = FastAPI(title="CVD Clothing Matcher API", version="2.0")
 
@@ -19,25 +22,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Resolve model paths relative to THIS file, not the process's working
+# directory. This is what lets main.py be imported and mounted from
+# server.py (running from anywhere) instead of only working when you `cd`
+# into cvdMatcher/ and run it directly.
+# ─────────────────────────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PKL_PATH = os.path.join(BASE_DIR, "model.pkl")
+MODEL_H5_PATH = os.path.join(BASE_DIR, "model.h5")
+
+FEATURE_COLUMNS = [
+    "weighted_avg_de", "min_de", "max_de", "de_range",
+    "n_colors_top", "n_colors_bot",
+    "top_dom_R", "top_dom_G", "top_dom_B",
+    "bot_dom_R", "bot_dom_G", "bot_dom_B",
+]
+
 # ── Load Models ────────────────────────────────────────────────────────────────
 
-with open("model.pkl", "rb") as f:
+with open(MODEL_PKL_PATH, "rb") as f:
     rf_model = pickle.load(f)
 print("✅ Random Forest model loaded")
 
 nn_model = None
 try:
     from tensorflow.keras.models import load_model
-    if os.path.exists("model.h5"):
-        nn_model = load_model("model.h5")
+    if os.path.exists(MODEL_H5_PATH):
+        nn_model = load_model(MODEL_H5_PATH)
         print("✅ Neural Network model loaded")
     else:
         print("⚠️  model.h5 not found — running RF-only mode")
 except Exception as e:
     print(f"⚠️  Could not load model.h5: {e} — running RF-only mode")
 
-    # ── Pre-load rembg session at startup ─────────────────────────────────────────
-REMBG_SESSION = new_session("u2net")   # ← ADD THIS BLOCK
+# ── Pre-load rembg session at startup ─────────────────────────────────────────
+REMBG_SESSION = new_session("u2net")
 print("✅ Background removal model loaded")
 
 # Label order must match training encoding: Good=0, Moderate=1, Poor=2
@@ -104,6 +124,33 @@ def rgb_to_lab(rgb):
 def calculate_delta_e(rgb1, rgb2):
     return round(float(deltaE_ciede2000(rgb_to_lab(rgb1), rgb_to_lab(rgb2))), 2)
 
+def multi_color_delta_e(top_palette, bot_palette):
+    """
+    Compares every colour in the top garment against every colour in the
+    bottom garment, weighted by how much of each garment they cover.
+    Returns weighted-average, min, max and range of Delta E across all pairs.
+    """
+    pairs = []
+    for t in top_palette:
+        for b in bot_palette:
+            de = calculate_delta_e(t["rgb"], b["rgb"])
+            weight = t["pct"] * b["pct"]
+            pairs.append((de, weight))
+
+    total_w = sum(w for _, w in pairs)
+    weighted_avg = sum(de * w for de, w in pairs) / total_w
+    min_de = min(de for de, _ in pairs)
+    max_de = max(de for de, _ in pairs)
+
+    return {
+        "weighted_avg_de": round(weighted_avg, 2),
+        "min_de": round(min_de, 2),
+        "max_de": round(max_de, 2),
+        "de_range": round(max_de - min_de, 2),
+    }
+
+print("Delta E functions ready")
+
 # ── Prediction ─────────────────────────────────────────────────────────────────
 
 def predict_rf(features):
@@ -116,10 +163,10 @@ def predict_rf(features):
     return label, confidence, prob_dict
 
 def predict_nn(features):
-    """Neural Network prediction → label + per-class probabilities."""
     if nn_model is None:
         return None, None, None
-    proba      = nn_model.predict(np.array(features), verbose=0)[0]
+    X = features.values if hasattr(features, "values") else np.array(features)
+    proba      = nn_model.predict(X, verbose=0)[0]
     label      = NN_CLASSES[int(np.argmax(proba))]
     prob_dict  = {c: round(float(p) * 100, 1) for c, p in zip(NN_CLASSES, proba)}
     confidence = round(float(max(proba)) * 100, 1)
@@ -304,7 +351,6 @@ def get_hue_category(rgb):
 # ── CVD Colour Confusion Pairs ─────────────────────────────────────────────────
 CVD_CONFUSION = {
     "Protanopia": [
-        # Red-green confusion (no red cone)
         ("red", "green"), ("red", "cyan"), ("red", "gray"),
         ("orange", "green"), ("orange", "cyan"), ("orange", "gray"),
         ("red", "olive"), ("red", "brown"), ("red", "teal"),
@@ -318,7 +364,6 @@ CVD_CONFUSION = {
         ("red", "lime"), ("orange", "lime"),
     ],
     "Deuteranopia": [
-        # Red-green confusion (no green cone)
         ("red", "green"), ("red", "yellow"), ("red", "olive"),
         ("orange", "yellow"), ("orange", "green"), ("orange", "olive"),
         ("green", "yellow"), ("green", "brown"), ("green", "gray"),
@@ -333,7 +378,6 @@ CVD_CONFUSION = {
         ("magenta", "red"), ("pink", "yellow"),
     ],
     "Tritanopia": [
-        # Blue-yellow confusion (no blue cone)
         ("blue", "yellow"), ("blue", "orange"), ("blue", "green"),
         ("violet", "yellow"), ("violet", "orange"), ("violet", "red"),
         ("cyan", "pink"), ("cyan", "gray"), ("cyan", "white"),
@@ -350,7 +394,6 @@ CVD_CONFUSION = {
 
 # ── Colour Display Names ────────────────────────────────────────────────────────
 COLOR_NAMES = {
-    # Neutrals
     "white":      "White",
     "black":      "Black",
     "gray":       "Gray",
@@ -359,8 +402,6 @@ COLOR_NAMES = {
     "beige":      "Beige",
     "cream":      "Cream/Off-White",
     "ivory":      "Ivory",
-
-    # Reds & Pinks
     "red":        "Red",
     "crimson":    "Crimson",
     "maroon":     "Maroon",
@@ -370,8 +411,6 @@ COLOR_NAMES = {
     "pink":       "Pink",
     "hot_pink":   "Hot Pink",
     "blush":      "Blush",
-
-    # Oranges & Browns
     "orange":     "Orange",
     "amber":      "Amber",
     "brown":      "Brown",
@@ -380,15 +419,11 @@ COLOR_NAMES = {
     "rust":       "Rust",
     "copper":     "Copper",
     "peach":      "Peach",
-
-    # Yellows
     "yellow":     "Yellow",
     "gold":       "Gold",
     "lime":       "Lime Green",
     "olive":      "Olive",
     "mustard":    "Mustard",
-
-    # Greens
     "green":      "Green",
     "teal":       "Teal",
     "emerald":    "Emerald Green",
@@ -397,8 +432,6 @@ COLOR_NAMES = {
     "forest":     "Forest Green",
     "army":       "Army Green",
     "cyan":       "Cyan",
-
-    # Blues
     "blue":       "Blue",
     "navy":       "Navy Blue",
     "sky":        "Sky Blue",
@@ -407,8 +440,6 @@ COLOR_NAMES = {
     "cobalt":     "Cobalt Blue",
     "periwinkle": "Periwinkle",
     "steel":      "Steel Blue",
-
-    # Purples
     "purple":     "Purple",
     "violet":     "Violet",
     "indigo":     "Indigo",
@@ -467,30 +498,40 @@ async def analyse(
     top_bytes    = await top.read()
     bottom_bytes = await bottom.read()
 
-    # Validate uploads
     for name, data in [("top", top_bytes), ("bottom", bottom_bytes)]:
         if not data:
             raise HTTPException(status_code=400, detail=f"Empty file for {name}")
 
-    # Colours
-    top_rgb    = get_dominant_color(top_bytes)
-    bottom_rgb = get_dominant_color(bottom_bytes)
-    delta_e    = calculate_delta_e(top_rgb, bottom_rgb)
-
-    # Palettes (top-3 colours per garment)
     top_palette    = get_color_palette(top_bytes,    n=3)
     bottom_palette = get_color_palette(bottom_bytes, n=3)
 
-    # Predictions
-    features = [[
-        top_rgb[0], top_rgb[1], top_rgb[2],
-        bottom_rgb[0], bottom_rgb[1], bottom_rgb[2],
-        delta_e,
-    ]]
-    (ensemble_label, ensemble_conf, ensemble_probs,
-     rf_label, rf_conf, nn_label, nn_conf) = ensemble_predict(features)
+    top_pairs    = [{"rgb": c["rgb"], "pct": c["percentage"] / 100} for c in top_palette]
+    bottom_pairs = [{"rgb": c["rgb"], "pct": c["percentage"] / 100} for c in bottom_palette]
 
-    # CVD
+    scores  = multi_color_delta_e(top_pairs, bottom_pairs)
+    top_rgb    = top_palette[0]["rgb"]
+    bottom_rgb = bottom_palette[0]["rgb"]
+    delta_e    = calculate_delta_e(top_rgb, bottom_rgb)
+
+    feature_row = {
+        "weighted_avg_de": scores["weighted_avg_de"],
+        "min_de":          scores["min_de"],
+        "max_de":          scores["max_de"],
+        "de_range":        scores["de_range"],
+        "n_colors_top":    len(top_palette),
+        "n_colors_bot":    len(bottom_palette),
+        "top_dom_R":       top_rgb[0],
+        "top_dom_G":       top_rgb[1],
+        "top_dom_B":       top_rgb[2],
+        "bot_dom_R":       bottom_rgb[0],
+        "bot_dom_G":       bottom_rgb[1],
+        "bot_dom_B":       bottom_rgb[2],
+    }
+    features_df = pd.DataFrame([feature_row])[FEATURE_COLUMNS]
+
+    (ensemble_label, ensemble_conf, ensemble_probs,
+     rf_label, rf_conf, nn_label, nn_conf) = ensemble_predict(features_df)
+
     top_cat    = get_hue_category(top_rgb)
     bottom_cat = get_hue_category(bottom_rgb)
     cvd_tip    = cvd_recommendation(top_cat, bottom_cat, cvd_type)
@@ -498,40 +539,22 @@ async def analyse(
     advice = MATCH_ADVICE.get(ensemble_label, MATCH_ADVICE["Moderate"])
 
     return {
-        # ── Colours ──
-        "top_color": {
-            "hex":     to_hex(top_rgb),
-            "name":    COLOR_NAMES.get(top_cat, top_cat),
-            "rgb":     top_rgb,
-            "palette": top_palette,
-        },
-        "bottom_color": {
-            "hex":     to_hex(bottom_rgb),
-            "name":    COLOR_NAMES.get(bottom_cat, bottom_cat),
-            "rgb":     bottom_rgb,
-            "palette": bottom_palette,
-        },
-
-        # ── Match ──
-        "delta_e":             delta_e,
+        "top_color": {"hex": to_hex(top_rgb), "name": COLOR_NAMES.get(top_cat, top_cat), "rgb": top_rgb, "palette": top_palette},
+        "bottom_color": {"hex": to_hex(bottom_rgb), "name": COLOR_NAMES.get(bottom_cat, bottom_cat), "rgb": bottom_rgb, "palette": bottom_palette},
+        "delta_e": delta_e,
         "delta_e_description": delta_e_description(delta_e),
-        "match_label":         f"{ensemble_label} match",
-        "confidence":          ensemble_conf,
-        "advice":              advice["tip"],
-        "advice_emoji":        advice["emoji"],
-
-        # ── Model breakdown ──
+        "match_label": f"{ensemble_label} match",
+        "confidence": ensemble_conf,
+        "advice": advice["tip"],
+        "advice_emoji": advice["emoji"],
         "model_details": {
-            "mode":              "ensemble" if nn_model is not None else "random_forest_only",
-            "ensemble_probs":    ensemble_probs,
-            "random_forest":     {"label": rf_label,  "confidence": rf_conf},
-            "neural_network":    {"label": nn_label,  "confidence": nn_conf}
-                                  if nn_model is not None else None,
+            "mode": "ensemble" if nn_model is not None else "random_forest_only",
+            "ensemble_probs": ensemble_probs,
+            "random_forest": {"label": rf_label, "confidence": rf_conf},
+            "neural_network": {"label": nn_label, "confidence": nn_conf} if nn_model is not None else None,
         },
-
-        # ── CVD ──
-        "cvd_type":    cvd_type,
-        "top_hard":    is_hard_to_distinguish(top_cat, cvd_type),
+        "cvd_type": cvd_type,
+        "top_hard": is_hard_to_distinguish(top_cat, cvd_type),
         "bottom_hard": is_hard_to_distinguish(bottom_cat, cvd_type),
-        "cvd_tip":     cvd_tip,
+        "cvd_tip": cvd_tip,
     }
