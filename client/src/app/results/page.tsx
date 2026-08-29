@@ -3,7 +3,7 @@
 import { ArrowUpRight, RotateCcw } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RecommendationLike } from "@/app/components/RecommendationCard";
 import {
   normalizeRecommendation,
@@ -14,12 +14,49 @@ import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
 import { useAppStore } from "@/app/context/AppStoreContext";
 import { mockRecommendations } from "@/app/data/recommendations";
+import { saveSystemData } from "@/app/lib/systemSaveApi";
 
 export default function ResultsPage() {
   const router = useRouter();
   const store = useAppStore();
 
   const [liked, setLiked] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!store.requirements && !store.prediction && store.recommendations.length === 0) {
+      return;
+    }
+
+    const payload = {
+      requirements: store.requirements,
+      occasion: store.occasion,
+      gender: store.gender,
+      colorPreference: store.colorPreference,
+      prediction: store.prediction,
+      recommendations: store.recommendations.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        matchReason: item.matchReason,
+        image: item.image,
+        price: item.price,
+        rating: item.rating,
+        tags: item.tags,
+        styleTips: item.styleTips,
+        colors: item.colors,
+        material: item.material,
+        occasion: item.occasion,
+        weather: item.weather,
+      })),
+      bodyMeasurements: store.bodyMeasurements,
+      metadata: {
+        view: "results",
+      },
+    };
+
+    void saveSystemData(payload).catch(() => undefined);
+  }, [store.requirements, store.occasion, store.gender, store.colorPreference, store.prediction, store.recommendations, store.bodyMeasurements]);
 
   const recommendations = (
     store.recommendations.length > 0

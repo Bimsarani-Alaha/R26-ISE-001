@@ -1,9 +1,10 @@
 "use client";
 
 import { ImagePlus } from "lucide-react";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
+import { CvdColourImpact, CVD_LABELS } from "./CvdColourImpact";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/";
 const API_URL = `${API_BASE.replace(/\/$/, "")}/coloranalyzer`;
@@ -15,11 +16,44 @@ interface CvdResult {
   detail?: string;
 }
 
-const CVD_LABELS: Record<string, string> = {
-  protanopia: "Protanopia — red-blind",
-  deuteranopia: "Deuteranopia — green-blind",
-  tritanopia: "Tritanopia — blue-blind",
-};
+export interface ColorEntry {
+  name: string;
+  rgb: number[];
+  percentage: number;
+  is_sub_color?: boolean;
+}
+
+export interface ColorResult {
+  success: boolean;
+  colors?: ColorEntry[];
+  base_color?: string;
+  base_color_confidence?: number;
+  color_type?: "single" | "dual" | "multi" | string;
+  detail?: string;
+}
+
+function base64ToFile(base64: string, filename: string, mime = "image/jpeg"): File {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new File([byteArray], filename, { type: mime });
+}
+
+async function analyzeColors(imageFile: File): Promise<ColorResult> {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+  formData.append("has_person", "false");
+  const res = await fetch(`${API_URL}/analyze`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.detail || "Color analysis failed");
+  return data as ColorResult;
+}
 
 export function CvdTab() {
   const [file, setFile] = useState<File | null>(null);
@@ -28,14 +62,57 @@ export function CvdTab() {
   const [result, setResult] = useState<CvdResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [originalAnalysis, setOriginalAnalysis] = useState<ColorResult | null>(null);
+  const [transformedAnalysis, setTransformedAnalysis] = useState<ColorResult | null>(null);
+
+  const applyFile = (f: File | null | undefined) => {
     if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
+    }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+    setOriginalAnalysis(null);
+    setTransformedAnalysis(null);
+    setAnalysisError(null);
+  };
+
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    applyFile(f);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragEnter = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    applyFile(f);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -48,6 +125,9 @@ export function CvdTab() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setOriginalAnalysis(null);
+    setTransformedAnalysis(null);
+    setAnalysisError(null);
 
     try {
       const formData = new FormData();
@@ -62,9 +142,26 @@ export function CvdTab() {
       const data = await res.json();
       if (!data.success) throw new Error(data.detail || "CVD generation failed");
       setResult(data);
+      setLoading(false);
+
+      setAnalyzing(true);
+      try {
+        const cvdFile = base64ToFile(data.cvd_image, `cvd-${cvdType}.jpg`);
+        const [origColors, transColors] = await Promise.all([
+          analyzeColors(file),
+          analyzeColors(cvdFile),
+        ]);
+        setOriginalAnalysis(origColors);
+        setTransformedAnalysis(transColors);
+      } catch (analysisErr) {
+        setAnalysisError(
+          analysisErr instanceof Error ? analysisErr.message : "Colour impact analysis failed"
+        );
+      } finally {
+        setAnalyzing(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Simulation failed");
-    } finally {
       setLoading(false);
     }
   };
@@ -77,13 +174,27 @@ export function CvdTab() {
           <p className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
             PHOTO
           </p>
-          <label className="flex cursor-pointer items-center gap-3 border border-dashed border-[#d7d7d7] px-4 py-3 transition hover:border-[#111] hover:bg-[#f5f5f5]">
+          <label
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer items-center gap-3 border border-dashed px-4 py-3 transition ${
+              isDragging
+                ? "border-[#111] bg-[#f0f0f0]"
+                : "border-[#d7d7d7] hover:border-[#111] hover:bg-[#f5f5f5]"
+            }`}
+          >
             <ImagePlus className="h-4 w-4 flex-shrink-0 text-[#777]" />
             <span
               className="truncate text-sm text-[#111]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              {file ? file.name : "Select a photo to simulate"}
+              {file
+                ? file.name
+                : isDragging
+                ? "Drop the photo here"
+                : "Select a photo to simulate, or drag & drop it here"}
             </span>
             <input
               type="file"
@@ -192,6 +303,17 @@ export function CvdTab() {
           </div>
         )}
       </div>
+
+      {/* COLOUR VISION IMPACT — logic + UI live in CvdColourImpact.tsx */}
+      {result && (
+        <CvdColourImpact
+          cvdType={cvdType}
+          analyzing={analyzing}
+          analysisError={analysisError}
+          originalAnalysis={originalAnalysis}
+          transformedAnalysis={transformedAnalysis}
+        />
+      )}
     </form>
   );
 }
