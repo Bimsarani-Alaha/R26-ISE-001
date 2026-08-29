@@ -1,9 +1,15 @@
 import base64
+import logging
 import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
 import cv2
 import numpy as np
-import sys
-from pathlib import Path
+from dotenv import load_dotenv
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +17,40 @@ from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from ColourAnalyzer.app import app as coloranalyzer_app
 from cvdMatcher.main import app as cvdmatcher_app
+
+
+logger = logging.getLogger(__name__)
+
+# MongoDB connection setup
+load_dotenv()
+
+MONGODB_URI = os.getenv("MONGODB_URI") or ""
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE") or "fashion_stylist"
+MONGODB_ALLOW_INSECURE_TLS = os.getenv("MONGODB_ALLOW_INSECURE_TLS", "false").lower() in {"1", "true", "yes", "on"}
+
+client = None
+db = None
+users_collection = None
+system_saves_collection = None
+
+if MONGODB_URI:
+    mongo_kwargs = {"serverSelectionTimeoutMS": 5000}
+    if MONGODB_ALLOW_INSECURE_TLS:
+        mongo_kwargs["tlsAllowInvalidCertificates"] = True
+
+    try:
+        client = MongoClient(MONGODB_URI, **mongo_kwargs)
+        client.admin.command("ping")
+        db = client[MONGODB_DATABASE]
+        users_collection = db["users"]
+        system_saves_collection = db["system_saves"]
+        logger.info("MongoDB connection successful.")
+    except Exception as exc:
+        logger.warning("MongoDB unavailable; continuing without a live connection: %s", exc)
+        client = None
+        db = None
+        users_collection = None
+        system_saves_collection = None
 
 
 # Ensure the sizePredictionEngine folder is importable by this server module.
@@ -42,6 +82,56 @@ class HealthTipsRequest(BaseModel):
     hip_size: float = Field(gt=0)
     height: float = Field(gt=0)
     gender: str = "unspecified"
+    clothing_size: str = "unspecified"
+
+
+class UserRequest(BaseModel):
+    name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    age: int | None = None
+    password: str | None = None
+    requirements: str | None = None
+    occasion: str | None = None
+    gender: str | None = None
+    colorPreference: str | None = None
+    prediction: dict | None = None
+    recommendations: list[dict] | None = None
+    bodyMeasurements: dict | None = None
+    metadata: dict | None = None
+
+#register the /api/register endpoint to save system data to MongoDB
+@app.post("/api/register")
+async def save_system(payload: UserRequest) -> dict:
+    if users_collection is None:
+        raise HTTPException(
+            status_code=503,
+            detail="MongoDB is unavailable. Please check the MongoDB connection and try again.",
+        )
+
+    document = payload.model_dump(exclude_none=True)
+    document["savedAt"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        result = users_collection.insert_one(document)
+    except PyMongoError as error:
+        logger.exception("Failed to save system payload to MongoDB")
+        raise HTTPException(
+            status_code=503,
+            detail="MongoDB is unavailable right now. The server could not save the registration data.",
+        ) from error
+    except Exception as error:
+        logger.exception("Unexpected error while saving registration payload")
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to save the system data.",
+        ) from error
+
+    return {
+        "success": True,
+        "message": "System data saved successfully.",
+        "id": str(result.inserted_id),
+    }
 
 
 @app.post("/api/health-tips")
@@ -52,13 +142,17 @@ async def health_tips(request: HealthTipsRequest) -> dict[str, str]:
             hip_size=request.hip_size,
             height=request.height,
             gender=request.gender,
+            clothing_size=request.clothing_size,
         )
     except HealthTipsConfigurationError as error:
+        logger.error("Health tips service configuration error: %s", error)
         raise HTTPException(status_code=503, detail="The guidance service is not configured.") from error
     except Exception as error:
+        logger.exception("Health tips service request failed")
         raise HTTPException(status_code=502, detail="The guidance service is unavailable.") from error
 
     if not guidance:
+        logger.error("Health tips service returned an empty response")
         raise HTTPException(status_code=502, detail="The guidance service returned an empty response.")
 
     return {"guidance": guidance}
