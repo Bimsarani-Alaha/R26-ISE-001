@@ -1,2 +1,0 @@
-artifacts/*.pth filter=lfs diff=lfs merge=lfs -text
-artifacts/*.pkl filter=lfs diff=lfs merge=lfs -text
