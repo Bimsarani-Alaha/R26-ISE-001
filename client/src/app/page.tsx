@@ -129,7 +129,7 @@ export default function HomePage() {
         transition={{ duration: 0.7, delay: 0.9 }}
         className="border-t border-[#e8e8e8]"
       >
-        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
+        <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-y md:divide-y-0 divide-[#e8e8e8]">
           {[
             {
               icon: "◻",
@@ -139,6 +139,12 @@ export default function HomePage() {
             },
             { icon: "◯", label: "AI OUTFIT CURATION", action: null },
             { icon: "◈", label: "OCCASION MATCHING", action: null },
+            {
+              icon: "▣",
+              label: "CLOTHING MATCHER",
+              action: () => router.push("/cvd-matcher"),
+              isClickable: true
+            },
             { icon: "⊹", label: "PERSONALIZED PICKS", action: null },
             // NEW: Color Analyzer button in feature strip
             { 
@@ -147,6 +153,7 @@ export default function HomePage() {
               action: () => router.push("/color-analyzer"),
               isClickable: true 
             },
+          
           ].map((feat) => (
             <div
               key={feat.label}
@@ -170,7 +177,7 @@ export default function HomePage() {
       </motion.div>
 
       {/* Membership-style section */}
-      <div className="px-8 md:px-16 py-16 bg-[#fafafa] border-t border-[#e8e8e8]">
+         <div className="px-8 md:px-16 py-16 bg-[#fafafa] border-t border-[#e8e8e8]">
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -180,7 +187,7 @@ export default function HomePage() {
         >
           HOW IT WORKS
         </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-0 max-w-5xl mx-auto border border-[#e5e5e5]">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-0 max-w-6xl mx-auto border border-[#e5e5e5]">
           {[
             {
               step: "01",
@@ -202,6 +209,11 @@ export default function HomePage() {
               title: "COLOR ANALYZER",
               desc: "Upload an outfit image and our AI analyzes the top and bottom colors to provide a matching score, helping you check whether the colors work well together.",
             },
+            {
+              step: "05",
+              title: "CLOTHING MATCHER",
+              desc: "Upload your top and bottom clothing images, select your vision type, and see a detailed colour match score along with visibility feedback tailored to your colour vision.",
+            },
           ].map((item, i) => (
             <motion.div
               key={item.step}
@@ -209,7 +221,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 1.1 + i * 0.1 }}
               className={`flex flex-col items-center text-center p-10 ${
-                i < 2
+                i < 4
                   ? "border-b md:border-b-0 md:border-r border-[#e5e5e5]"
                   : ""
               } bg-white`}
