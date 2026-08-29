@@ -1,3 +1,90 @@
+# Refined Recommendation Input Flow Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Restructure the recommendation input flow into two progressive steps (occasion, then free-text description) while keeping the backend, results, and detail pages unchanged.
+
+**Architecture:** Frontend-only change to the Next.js client. The `/input` page becomes a two-step progressive reveal (Step 1: occasion chips; Step 2: free-text textarea). The shared store drops `gender`/`colorPreference`. `/processing` composes a prompt of `Occasion: <occasion>. <free text>` and sends it to the existing `/predict` endpoint. The model extracts color/usage/articleType as before.
+
+**Tech Stack:** Next.js 16 (App Router, client components), React 19, motion, lucide-react, Tailwind CSS 4, Biome (lint/format), shared React context store.
+
+## Global Constraints
+
+- No new routes. Only `/input`, `AppStoreContext.tsx`, and `/processing` change.
+- No backend/model changes. `/predict` still receives `{ text: string }`.
+- Remove `gender` and `colorPreference` from the store and all their usages.
+- Step 1 (occasion) and Step 2 (free text) are both required before submit.
+- Prompt format sent to `/predict`: `Occasion: <occasion>. <free text>`.
+- Existing visual language must be preserved: `SANS`/`SERIF` from `typography`, `FilterChip` styling, `motion` entrance animations, `SiteNav`.
+- No test runner is configured in `client/`. Verification is `npm run lint` (Biome) and `npm run build`. Follow existing patterns; do not add a test framework.
+
+---
+
+### Task 1: Remove gender and colorPreference from the shared store
+
+**Files:**
+- Modify: `client/src/app/context/AppStoreContext.tsx`
+
+**Interfaces:**
+- Consumes: `BackendPrediction` (from `client/src/app/lib/recommendationApi`), `ClothingItem` (from `client/src/app/data/recommendations`).
+- Produces: `AppStore` context retaining `requirements`, `occasion`, `prediction`, `recommendations` and their setters; deleting `gender`, `colorPreference`, `setGender`, `setColorPreference`.
+
+- [ ] **Step 1: Remove the four deleted members from the type**
+
+In `client/src/app/context/AppStoreContext.tsx`, edit the `AppStore` type (lines 13-26):
+
+```tsx
+type AppStore = {
+  requirements: string;
+  occasion: string;
+  prediction: BackendPrediction | null;
+  recommendations: ClothingItem[];
+  setRequirements: (v: string) => void;
+  setOccasion: (v: string) => void;
+  setPrediction: (v: BackendPrediction | null) => void;
+  setRecommendations: (v: ClothingItem[]) => void;
+};
+```
+
+- [ ] **Step 2: Remove the deleted state and value members**
+
+Remove these four lines from the provider (currently lines 33-34 and 42-49):
+
+```tsx
+const [gender, setGender] = useState("");
+const [colorPreference, setColorPreference] = useState("");
+```
+
+and remove `gender,`, `colorPreference,`, `setGender,`, `setColorPreference,` from the `value` object (lines 42-49) and its dependency array (lines 56-57).
+
+- [ ] **Step 3: Verify the store no longer references removed members**
+
+Run: `npm run lint` in `client/`
+Expected: no errors (Biome reports nothing for this file).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/src/app/context/AppStoreContext.tsx
+git commit -m "refactor: remove gender and colorPreference from app store"
+```
+
+---
+
+### Task 2: Restructure the input page into two progressive steps
+
+**Files:**
+- Modify: `client/src/app/input/page.tsx` (full rewrite of the component body)
+
+**Interfaces:**
+- Consumes: `useAppStore()` from `client/src/app/context/AppStoreContext` (now without `gender`/`colorPreference`); `SiteNav`, `SANS`, `SERIF`, `Badge`, `Button`, `Textarea` — all unchanged.
+- Produces: On submit, sets `occasion` and `requirements` on the store, clears `prediction` and `recommendations`, then routes to `/processing`.
+
+- [ ] **Step 1: Write the new input page**
+
+Replace the entire contents of `client/src/app/input/page.tsx` with:
+
+```tsx
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
@@ -256,3 +343,140 @@ export default function InputPage() {
     </div>
   );
 }
+```
+
+- [ ] **Step 2: Run lint**
+
+Run: `npm run lint` in `client/`
+Expected: no errors.
+
+- [ ] **Step 3: Run build**
+
+Run: `npm run build` in `client/`
+Expected: build succeeds.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/src/app/input/page.tsx
+git commit -m "feat: two-step input flow (occasion, then free-text description)"
+```
+
+---
+
+### Task 3: Update processing page prompt composition
+
+**Files:**
+- Modify: `client/src/app/processing/page.tsx`
+
+**Interfaces:**
+- Consumes: `useAppStore()` (now without `gender`/`colorPreference`); `fetchRecommendations(text)` from `client/src/app/lib/recommendationApi`.
+- Produces: calls `fetchRecommendations` with the composed prompt, then `setPrediction`/`setRecommendations` and routes to `/results`.
+
+- [ ] **Step 1: Update the store destructuring**
+
+In `client/src/app/processing/page.tsx`, change line 31 from:
+
+```tsx
+  const { requirements, occasion, gender, colorPreference, setPrediction, setRecommendations } =
+    useAppStore();
+```
+
+to:
+
+```tsx
+  const { requirements, occasion, setPrediction, setRecommendations } =
+    useAppStore();
+```
+
+- [ ] **Step 2: Update prompt composition**
+
+Replace the `filters`/`prompt` block (currently lines 66-73):
+
+```tsx
+        const filters = [
+          occasion && `Occasion: ${occasion}`,
+          gender && `Gender: ${gender}`,
+          colorPreference && `Colour preference: ${colorPreference}`,
+        ].filter(Boolean);
+        const prompt = filters.length
+          ? `${requirements}. ${filters.join(". ")}.`
+          : requirements;
+```
+
+with:
+
+```tsx
+        const prompt = occasion
+          ? `Occasion: ${occasion}. ${requirements}`
+          : requirements;
+```
+
+- [ ] **Step 3: Update the effect dependency array**
+
+Replace line 110:
+
+```tsx
+  }, [router, requirements, occasion, gender, colorPreference, setPrediction, setRecommendations]);
+```
+
+with:
+
+```tsx
+  }, [router, requirements, occasion, setPrediction, setRecommendations]);
+```
+
+- [ ] **Step 4: Run lint**
+
+Run: `npm run lint` in `client/`
+Expected: no errors.
+
+- [ ] **Step 5: Run build**
+
+Run: `npm run build` in `client/`
+Expected: build succeeds.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add client/src/app/processing/page.tsx
+git commit -m "feat: compose occasion-first prompt in processing page"
+```
+
+---
+
+### Task 4: Verify no stale references and manual flow check
+
+**Files:**
+- Inspect: `client/src/app/results/page.tsx`, `client/src/app/detail/[id]/page.tsx` (should not reference `gender`/`colorPreference`).
+
+- [ ] **Step 1: Grep for stale references**
+
+Run in repo root: `rg "colorPreference|setColorPreference|setGender|\bgender\b" client/src`
+Expected: no matches.
+
+- [ ] **Step 2: Final lint and build**
+
+Run: `npm run lint` then `npm run build` in `client/`
+Expected: both pass.
+
+- [ ] **Step 3: Manual flow check (with backend running, if available)**
+
+1. Start the FastAPI backend (`uvicorn src.api.app:app --reload` from `styleRecommendationEngine/`).
+2. Start the client (`npm run dev` in `client/`).
+3. Open `/input`: Confirm the Continue button is disabled until an occasion is selected.
+4. Select an occasion → Continue. Confirm Step 2 shows the occasion summary.
+5. Type a description → "Get Recommendations". Confirm the prompt sent is `Occasion: <occasion>. <description>` (inspect the network tab).
+6. Confirm navigation to `/processing`, then `/results`, and that `/detail/[id]` renders description, color, occasion, and style tips.
+
+- [ ] **Step 4: Commit any follow-up fixes**
+
+If any fix was needed, commit it with a descriptive message.
+
+---
+
+## Self-Review Notes
+
+- Spec coverage: occasion-first step (Task 2), free-text extraction via existing model (Task 3 prompt), remove gender/color chips (Tasks 1-2), results/detail unchanged (Task 4 inspection), error handling unchanged (no code path touched in Task 3 beyond prompt).
+- No placeholders: all code blocks are complete.
+- Type consistency: `useAppStore()` signature after Task 1 matches Tasks 2-3 usages.

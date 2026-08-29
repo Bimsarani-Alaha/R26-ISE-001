@@ -1,0 +1,22 @@
+{
+  "marriage": "Wedding",
+  "wedding ceremony": "Wedding",
+  "marriage function": "Wedding",
+  "wedding function": "Wedding",
+  "birthday celebration": "Party",
+  "birthday party": "Party",
+  "birthday": "Party",
+  "date night": "Formal",
+  "formal event": "Formal",
+  "office meeting": "Formal",
+  "work": "Formal",
+  "office": "Formal",
+  "casual outing": "Casual",
+  "everyday": "Casual",
+  "beach day": "Casual",
+  "vacation": "Casual",
+  "festival celebration": "Party",
+  "dinner": "Formal",
+  "interview": "Formal",
+  "sports": "Casual"
+}
