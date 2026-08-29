@@ -32,6 +32,7 @@ export default function HealthTipsPage() {
       hip_size: bodyMeasurements.hipCm,
       height: bodyMeasurements.heightCm,
       gender: bodyMeasurements.gender,
+      clothing_size: bodyMeasurements.clothingSize,
     })
       .then((result) => {
         if (!cancelled) setGuidance(result.guidance);
@@ -63,6 +64,7 @@ export default function HealthTipsPage() {
       hip_size: bodyMeasurements.hipCm,
       height: bodyMeasurements.heightCm,
       gender: bodyMeasurements.gender,
+      clothing_size: bodyMeasurements.clothingSize,
     })
       .then((result) => setGuidance(result.guidance))
       .catch((requestError: unknown) => {

@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowUpRight, ImagePlus, Sparkles } from "lucide-react";
+import { ArrowUpRight, Camera, ImagePlus, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
 import { useAppStore } from "@/app/context/AppStoreContext";
@@ -28,17 +28,96 @@ export default function SizePage() {
   const [message, setMessage] = useState<string>("");
   const [height, setHeight] = useState("");
   const [gender, setGender] = useState("Women");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraReady(false);
+    setCameraOpen(false);
+  };
+
+  useEffect(() => {
+    if (cameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraOpen]);
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
+  const openCamera = async () => {
+    if (!window.isSecureContext) {
+      setMessage("Camera access requires HTTPS. Open this app at http://localhost:3000 or use an HTTPS address.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage("Camera access is not supported by this browser.");
+      return;
+    }
+
+    try {
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      setMessage("");
+      setCameraReady(false);
+      setCameraOpen(true);
+    } catch {
+      setMessage("Unable to access the camera. Please allow camera permission and try again.");
+    }
+  };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
+    handleFile(f);
+  };
+
+  const handleFile = (f: File) => {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResultImage("");
     setMeasurements([]);
     setMessage("");
     setHeight("");
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video?.videoWidth || !video.videoHeight) {
+      setMessage("The camera is not ready yet. Please wait a moment and try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setMessage("Unable to capture an image from the camera.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setMessage("Unable to capture an image from the camera.");
+        return;
+      }
+      handleFile(new File([blob], "camera-capture.jpg", { type: "image/jpeg" }));
+      stopCamera();
+    }, "image/jpeg", 0.92);
   };
 
   const handleUpload = async () => {
@@ -87,6 +166,7 @@ export default function SizePage() {
           hipCm: firstMeasurement.hip_cm,
           heightCm: Number(height),
           gender,
+          clothingSize: firstMeasurement.size ?? "unspecified",
         });
       }
 
@@ -263,6 +343,61 @@ export default function SizePage() {
             </div>
 
             <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
+              {cameraOpen ? (
+                <div className="border border-dashed border-[#d7d7d7] bg-white p-3">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    onLoadedMetadata={() => setCameraReady(true)}
+                    className="max-h-80 w-full object-contain"
+                  />
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={capturePhoto}
+                      disabled={!cameraReady}
+                      className="flex-1 border border-[#111] bg-white px-4 py-2.5 text-sm font-medium text-[#111] transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:border-[#ddd] disabled:text-[#999]"
+                    >
+                      Capture Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="border border-[#d7d7d7] bg-white px-4 py-2.5 text-sm text-[#555] transition hover:border-[#111] hover:text-[#111]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 border border-dashed border-[#d7d7d7] bg-white px-4 py-3 text-center text-sm font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
+                >
+                  <Camera className="h-4 w-4 text-[#777]" />
+                  <span>Open Camera</span>
+                </button>
+              )}
+
+              {file && (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="mt-3 flex w-full items-center justify-center gap-2 border border-[#d7d7d7] bg-white px-3 py-2 text-xs font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
+                >
+                  <Camera className="h-3.5 w-3.5 text-[#777]" />
+                  Capture Photo Again
+                </button>
+              )}
+
+              <div className="my-4 flex items-center gap-3 text-[10px] tracking-[0.2em] text-[#999]" style={SANS}>
+                <span className="h-px flex-1 bg-[#e5e5e5]" />
+                OR SELECT AN IMAGE
+                <span className="h-px flex-1 bg-[#e5e5e5]" />
+              </div>
+
               <label className="flex cursor-pointer flex-col items-center justify-center border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center transition hover:border-[#111] hover:bg-[#f5f5f5]">
                 <ImagePlus className="h-6 w-6 text-[#777]" />
                 <span className="mt-3 text-sm font-medium text-[#111]">
@@ -280,7 +415,7 @@ export default function SizePage() {
               </label>
 
               {file && (
-                <div className="mt-3 text-xs uppercase tracking-[0.2em] text-[#666]">
+                <div className="mt-3 truncate text-xs uppercase tracking-[0.2em] text-[#666]">
                   {file.name}
                 </div>
               )}

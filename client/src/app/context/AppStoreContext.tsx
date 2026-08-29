@@ -32,6 +32,7 @@ export type BodyMeasurements = {
   hipCm: number;
   heightCm: number;
   gender: string;
+  clothingSize: string;
 };
 
 const AppStoreContext = createContext<AppStore | null>(null);
