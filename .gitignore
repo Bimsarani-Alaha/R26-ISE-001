@@ -206,6 +206,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Style Recommendation Engine (local only)
+styleRecommendationEngine/
+
 # PyPI configuration file
 .pypirc
 
