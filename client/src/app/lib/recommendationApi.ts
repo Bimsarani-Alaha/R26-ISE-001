@@ -34,6 +34,13 @@ const IMAGE_BY_CATEGORY: Record<string, string> = {
     "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1080&q=80",
 };
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 function inferCategory(articleType: string) {
   const normalized = articleType.toLowerCase();
 
@@ -74,7 +81,7 @@ export function toClothingItem(
     record.link || IMAGE_BY_CATEGORY[category] || IMAGE_BY_CATEGORY.Top;
 
   return {
-    id: `${record.productDisplayName}-${index}`,
+    id: `${slugify(record.productDisplayName)}-${index}`,
     name: record.productDisplayName,
     category,
     description: `A ${color.toLowerCase()} ${record.articleType.toLowerCase()} suited for ${record.usage.toLowerCase()} wear.`,
