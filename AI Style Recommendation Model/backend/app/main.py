@@ -8,7 +8,7 @@ from .api.recommendations import router as recommendations_router
 from .api.stylist import router as stylist_router
 from .services.product_service import product_service
 from .services.qwen_service import qwen_service
-from .config import IMAGES_DIR
+from .config import IMAGES_DIR, QWEN_MODEL
 
 app = FastAPI(
     title="AI Fashion Recommendation System",
@@ -34,8 +34,11 @@ if IMAGES_DIR.exists():
 
 @app.on_event("startup")
 async def startup_event():
-    product_service.load_dataset()
-    print(f"Loaded {len(product_service.df)} products")
+    try:
+        product_service.load_dataset()
+        print(f"Loaded {len(product_service.df)} products")
+    except Exception as e:
+        print(f"ERROR loading dataset: {e}")
     connected = await qwen_service.check_connection()
     print(f"Ollama connected: {connected}")
 
@@ -47,10 +50,13 @@ async def root():
 
 @app.get("/api/health")
 async def health():
-    connected = await qwen_service.check_connection()
+    product_service._ensure_loaded()
+    model_available = await qwen_service.check_connection()
     return {
-        "status": "healthy",
-        "ollama_connected": connected,
+        "status": "healthy" if model_available else "degraded",
+        "model_available": model_available,
+        "ollama_connected": model_available,
+        "model_name": QWEN_MODEL,
         "products_loaded": product_service.df is not None,
         "product_count": len(product_service.df) if product_service.df is not None else 0,
     }

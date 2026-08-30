@@ -70,27 +70,27 @@ class ProductService:
 
         df["image_exists"] = df["image_path"].apply(check_image)
 
-    def get_all_products(self) -> pd.DataFrame:
+    def _ensure_loaded(self):
         if self.df is None:
             self.load_dataset()
+
+    def get_all_products(self) -> pd.DataFrame:
+        self._ensure_loaded()
         return self.df
 
     def get_product_by_id(self, product_id: str) -> Optional[dict]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         row = self.df[self.df["product_id"] == product_id]
         if row.empty:
             return None
         return row.iloc[0].to_dict()
 
     def get_unique_genders(self) -> list[str]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         return sorted(self.df["gender"].dropna().unique().tolist())
 
     def get_unique_occasions(self) -> list[str]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         occasions = set()
         for val in self.df["occasion"].dropna().unique():
             for part in str(val).replace("/", ",").split(","):
