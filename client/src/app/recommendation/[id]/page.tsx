@@ -1,12 +1,10 @@
 "use client";
 
 import {
-  ArrowUpRight,
   CheckCircle,
   Heart,
   Lightbulb,
   Package,
-  ShoppingBag,
   Star,
   Tag,
 } from "lucide-react";
@@ -60,9 +58,8 @@ const colorDots: Record<string, string> = {
 export default function RecommendationDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { productResults, requirements, gender, size } = useAppStore();
+  const { productResults, requirements, gender, size, hydrated } = useAppStore();
   const [liked, setLiked] = useState(false);
-  const [addedToBag, setAddedToBag] = useState(false);
   const [stylistTips, setStylistTips] = useState<GetStylistResponse | null>(
     null,
   );
@@ -70,6 +67,14 @@ export default function RecommendationDetailPage() {
   const [tipsError, setTipsError] = useState("");
 
   const itemId = Array.isArray(id) ? id[0] : id;
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-[#888] text-sm" style={SANS}>Loading…</p>
+      </div>
+    );
+  }
 
   const item = productResults.find((r) => r.product_id === itemId);
 
@@ -80,6 +85,7 @@ export default function RecommendationDetailPage() {
           <p className="text-[#888] mb-4" style={SANS}>
             Item not found
           </p>
+          <p className="text-[#aaa] text-xs mb-4" style={SANS}>Try going back to results — refresh clears non-persisted state if you cleared storage.</p>
           <button
             type="button"
             onClick={() => router.push("/recommendation/results")}
@@ -92,11 +98,6 @@ export default function RecommendationDetailPage() {
       </div>
     );
   }
-
-  const handleAddToBag = () => {
-    setAddedToBag(true);
-    setTimeout(() => setAddedToBag(false), 2500);
-  };
 
   const handleGetStylistTips = async () => {
     if (stylistTips) {
@@ -112,7 +113,7 @@ export default function RecommendationDetailPage() {
         gender,
         size,
         requirements,
-        product_id: itemId,
+        product_id: itemId ?? "",
       });
       setStylistTips(tips);
     } catch (err) {
@@ -158,6 +159,13 @@ export default function RecommendationDetailPage() {
                 src={getImageUrl(item.image_path)}
                 alt={item.article_type}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  if (img.dataset.fallback !== "true") {
+                    img.dataset.fallback = "true";
+                    img.src = `${API_BASE_URL}/fashion-recommendation/images/placeholder.jpg`;
+                  }
+                }}
               />
               {/* Like */}
               <button
@@ -169,6 +177,33 @@ export default function RecommendationDetailPage() {
                   className={`w-4 h-4 transition-colors ${liked ? "fill-[#111] text-[#111]" : "text-[#888]"}`}
                 />
               </button>
+
+              {/* Analyzing overlay */}
+              {loadingTips && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 bg-white/40 backdrop-blur-[1px]"
+                  />
+                  <motion.div
+                    animate={{ top: ["0%", "100%", "0%"] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute left-0 right-0 h-[2px] bg-[#111] shadow-[0_0_12px_rgba(0,0,0,0.4)]"
+                    style={{ top: "50%" }}
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-2 border-[#111] border-t-transparent rounded-full bg-white/80"
+                    />
+                    <span className="text-[10px] tracking-[0.2em] text-[#111] bg-white/90 px-3 py-1.5 border border-[#111]" style={SANS}>
+                      ANALYZING IMAGE…
+                    </span>
+                  </div>
+                </>
+              )}
 
               {/* AI Match badge */}
               <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-[#e8e8e8] px-4 py-3">
@@ -234,14 +269,14 @@ export default function RecommendationDetailPage() {
                   className="text-3xl text-[#111]"
                   style={{ ...SERIF, fontWeight: 400 }}
                 >
-                  ${item.price.toFixed(2)}
+                  Rs. {item.price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                 </span>
                 {originalPrice && (
                   <span
                     className="text-sm text-[#bbb] line-through"
                     style={SANS}
                   >
-                    ${originalPrice}
+                    Rs. {Number(originalPrice).toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
@@ -344,175 +379,6 @@ export default function RecommendationDetailPage() {
               </Button>
             </div>
 
-            {/* AI Stylist Tips Display */}
-            {stylistTips && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-8"
-              >
-                <Card className="border border-[#e8e8e8] rounded-none bg-[#fafafa] gap-0 p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Lightbulb className="w-4 h-4 text-[#111]" />
-                    <span
-                      className="text-[10px] tracking-[0.25em] text-[#111]"
-                      style={SANS}
-                    >
-                      AI STYLING TIPS
-                    </span>
-                  </div>
-
-                  {/* Summary */}
-                  {stylistTips.summary && (
-                    <p
-                      className="text-sm text-[#555] leading-relaxed mb-4 italic"
-                      style={{ ...SERIF, fontWeight: 300 }}
-                    >
-                      &quot;{stylistTips.summary}&quot;
-                    </p>
-                  )}
-
-                  {/* Accessories */}
-                  {stylistTips.accessories.length > 0 && (
-                    <div className="mb-4">
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        ACCESSORIES
-                      </p>
-                      <ul className="space-y-1">
-                        {stylistTips.accessories.map((tip) => (
-                          <li
-                            key={tip}
-                            className="text-xs text-[#666] flex items-start gap-2"
-                            style={SANS}
-                          >
-                            <span className="text-[#ccc]">·</span>
-                            {tip}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Footwear */}
-                  {stylistTips.footwear.length > 0 && (
-                    <div className="mb-4">
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        FOOTWEAR
-                      </p>
-                      <ul className="space-y-1">
-                        {stylistTips.footwear.map((tip) => (
-                          <li
-                            key={tip}
-                            className="text-xs text-[#666] flex items-start gap-2"
-                            style={SANS}
-                          >
-                            <span className="text-[#ccc]">·</span>
-                            {tip}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Color Combinations */}
-                  {stylistTips.color_combinations.length > 0 && (
-                    <div className="mb-4">
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        COLOR COMBINATIONS
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {stylistTips.color_combinations.map((color) => (
-                          <Badge
-                            key={color}
-                            variant="outline"
-                            className="text-[9px] tracking-[0.1em] text-[#666] border border-[#ddd] px-2 py-0.5 rounded-none"
-                            style={SANS}
-                          >
-                            {color}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Layering */}
-                  {stylistTips.layering.length > 0 && (
-                    <div className="mb-4">
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        LAYERING
-                      </p>
-                      <ul className="space-y-1">
-                        {stylistTips.layering.map((tip) => (
-                          <li
-                            key={tip}
-                            className="text-xs text-[#666] flex items-start gap-2"
-                            style={SANS}
-                          >
-                            <span className="text-[#ccc]">·</span>
-                            {tip}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Occasion Tip */}
-                  {stylistTips.occasion_tip && (
-                    <div className="mb-4">
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        OCCASION TIP
-                      </p>
-                      <p
-                        className="text-xs text-[#666] italic"
-                        style={{ ...SERIF, fontWeight: 300 }}
-                      >
-                        {stylistTips.occasion_tip}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Complementary Items */}
-                  {stylistTips.complementary_items.length > 0 && (
-                    <div>
-                      <p
-                        className="text-[9px] tracking-[0.2em] text-[#aaa] mb-2"
-                        style={SANS}
-                      >
-                        COMPLEMENTARY ITEMS
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {stylistTips.complementary_items.map((item) => (
-                          <Badge
-                            key={item}
-                            variant="outline"
-                            className="text-[9px] tracking-[0.1em] text-[#666] border border-[#ddd] px-2 py-0.5 rounded-none"
-                            style={SANS}
-                          >
-                            {item}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              </motion.div>
-            )}
-
             {/* Tips Error */}
             {tipsError && (
               <motion.div
@@ -534,48 +400,160 @@ export default function RecommendationDetailPage() {
               </motion.div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                onClick={handleAddToBag}
-                variant="default"
-                className={`flex-1 py-3.5 text-xs tracking-[0.2em] flex items-center justify-center gap-2 transition-all duration-300 rounded-none h-auto ${
-                  addedToBag
-                    ? "bg-[#555] text-white hover:bg-[#555]"
-                    : "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
-                }`}
-                style={SANS}
-              >
-                {addedToBag ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    ADDED TO BAG
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-4 h-4" />
-                    ADD TO BAG
-                  </>
-                )}
-              </Button>
+            {/* Wishlist */}
+            <div className="flex">
               <Button
                 type="button"
                 onClick={() => setLiked(!liked)}
                 variant="outline"
-                className={`w-14 flex items-center justify-center rounded-none h-auto ${
+                className={`w-full py-3.5 text-xs tracking-[0.2em] flex items-center justify-center gap-2 rounded-none h-auto ${
                   liked
-                    ? "border-[#111] bg-[#111] hover:bg-[#111]"
-                    : "border-[#ddd] hover:border-[#999] hover:bg-transparent"
+                    ? "border-[#111] bg-[#111] text-white hover:bg-[#111]"
+                    : "border-[#ddd] text-[#555] hover:border-[#111] hover:text-[#111] hover:bg-transparent"
                 }`}
+                style={SANS}
               >
                 <Heart
                   className={`w-4 h-4 ${liked ? "fill-white text-white" : "text-[#888]"}`}
                 />
+                {liked ? "WISHLISTED" : "ADD TO WISHLIST"}
               </Button>
             </div>
           </motion.div>
         </div>
+
+        {/* Full-width AI Styling Tips — visual color swatches + spacious layout */}
+        {stylistTips && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mt-8 border border-[#111] bg-[#fafafa]"
+          >
+            <div className="border-b border-[#111] bg-white px-6 py-4 flex items-center gap-3">
+              <Lightbulb className="w-4 h-4 text-[#111]" />
+              <span className="text-[11px] tracking-[0.25em] text-[#111]" style={SANS}>
+                AI STYLING TIPS
+              </span>
+              <span className="ml-auto text-[10px] tracking-[0.15em] text-[#999]" style={SANS}>
+                {item.article_type.toUpperCase()} · {item.base_colour}
+              </span>
+            </div>
+
+            {stylistTips.summary && (
+              <div className="px-6 md:px-8 py-6 border-b border-[#e8e8e8] bg-white">
+                <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-2" style={SANS}>OVERVIEW</p>
+                <p className="text-base text-[#222] leading-relaxed italic" style={{ ...SERIF, fontWeight: 300 }}>
+                  &quot;{stylistTips.summary}&quot;
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+              {/* Accessories */}
+              {stylistTips.accessories.length > 0 && (
+                <div className="p-6 md:p-8 border-b md:border-b-0 md:border-r border-[#e8e8e8] bg-white">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>ACCESSORIES</p>
+                  <ul className="space-y-3">
+                    {stylistTips.accessories.map((tip) => (
+                      <li key={tip} className="flex items-start gap-3 text-sm text-[#333] leading-relaxed" style={SANS}>
+                        <span className="mt-1.5 w-1.5 h-1.5 bg-[#111] rounded-full flex-shrink-0" />
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Footwear */}
+              {stylistTips.footwear.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-[#e8e8e8] bg-white">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>FOOTWEAR</p>
+                  <ul className="space-y-3">
+                    {stylistTips.footwear.map((tip) => (
+                      <li key={tip} className="flex items-start gap-3 text-sm text-[#333] leading-relaxed" style={SANS}>
+                        <span className="mt-1.5 w-1.5 h-1.5 bg-[#111] rounded-full flex-shrink-0" />
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Color Combinations — visual swatches */}
+              {stylistTips.color_combinations.length > 0 && (
+                <div className="p-6 md:p-8 border-b md:border-r border-[#e8e8e8] bg-[#fcfcfc]">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>COLOR COMBINATIONS</p>
+                  <div className="space-y-4">
+                    {stylistTips.color_combinations.map((combo) => {
+                      const parts = combo.split(/\+|,|and|\//i).map((s) => s.trim()).filter(Boolean);
+                      return (
+                        <div key={combo} className="flex items-center gap-3 bg-white border border-[#e8e8e8] px-4 py-3">
+                          <div className="flex -space-x-1">
+                            {parts.map((part) => {
+                              const key = Object.keys(colorDots).find((k) => part.toLowerCase().includes(k.toLowerCase())) || part.split(" ")[0];
+                              const hex = colorDots[key] || colorDots[part] || "#ddd";
+                              return (
+                                <span
+                                  key={part}
+                                  title={part}
+                                  className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex-shrink-0"
+                                  style={{ background: hex }}
+                                />
+                              );
+                            })}
+                          </div>
+                          <span className="text-sm text-[#333] tracking-wide" style={SANS}>{combo}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-[#bbb] mt-3" style={SANS}>Swatches are approximate — actual fabric may vary.</p>
+                </div>
+              )}
+
+              {/* Layering */}
+              {stylistTips.layering.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-[#e8e8e8] bg-white">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>LAYERING</p>
+                  <ul className="space-y-3">
+                    {stylistTips.layering.map((tip) => (
+                      <li key={tip} className="flex items-start gap-3 text-sm text-[#333] leading-relaxed" style={SANS}>
+                        <span className="mt-1.5 w-1.5 h-1.5 bg-[#111] rounded-full flex-shrink-0" />
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Occasion Tip — full width inside grid */}
+              {stylistTips.occasion_tip && (
+                <div className="p-6 md:p-8 border-b md:border-r border-[#e8e8e8] bg-white md:col-span-2">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-3" style={SANS}>OCCASION TIP</p>
+                  <p className="text-sm text-[#333] leading-relaxed italic" style={{ ...SERIF, fontWeight: 300 }}>
+                    {stylistTips.occasion_tip}
+                  </p>
+                </div>
+              )}
+
+              {/* Complementary Items — visual badges */}
+              {stylistTips.complementary_items.length > 0 && (
+                <div className="p-6 md:p-8 bg-white md:col-span-2">
+                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>COMPLEMENTARY ITEMS</p>
+                  <div className="flex flex-wrap gap-2">
+                    {stylistTips.complementary_items.map((it) => (
+                      <span key={it} className="inline-flex items-center gap-2 border border-[#111] bg-white px-4 py-2 text-xs tracking-wide text-[#111]" style={SANS}>
+                        <span className="w-1.5 h-1.5 bg-[#111] rounded-full" />
+                        {it}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

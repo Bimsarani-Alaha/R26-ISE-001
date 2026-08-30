@@ -1,6 +1,22 @@
 import os
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+
+    # Load backend/.env when running standalone (uvicorn app.main:app)
+    # Unified gateway (server/server.py) also loads this file, so this is a no-op there.
+    _backend_env = Path(__file__).resolve().parent.parent / ".env"
+    _root_env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _backend_env.exists():
+        load_dotenv(dotenv_path=_backend_env, override=False)
+    if _root_env.exists():
+        load_dotenv(dotenv_path=_root_env, override=False)
+    # Also try default cwd lookup as fallback
+    load_dotenv(override=False)
+except Exception:
+    pass
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 IMAGES_DIR = BASE_DIR / "images"

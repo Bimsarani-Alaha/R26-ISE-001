@@ -29,17 +29,37 @@ class RecommendationService:
         pass
 
     def filter_by_gender(self, df: pd.DataFrame, gender: str) -> pd.DataFrame:
+        # Normalize client values (Male/Female from frontend GENDERS) to dataset values (Men/Women)
+        g = gender.strip().lower()
+        if g in ("female", "women", "woman"):
+            target = "women"
+        elif g in ("male", "men", "man"):
+            target = "men"
+        elif g in ("unisex",):
+            target = "unisex"
+        else:
+            target = g
         return df[
-            (df["gender"].str.lower() == gender.lower())
+            (df["gender"].str.lower() == target)
             | (df["gender"].str.lower() == "unisex")
         ].copy()
 
     def filter_by_size(self, df: pd.DataFrame, size: str) -> pd.DataFrame:
         size_upper = size.upper()
         aliases = [size_upper] + SIZE_ALIASES.get(size_upper, [])
-        return df[df["available_sizes"].apply(
-            lambda sizes: any(a in sizes for a in aliases)
-        )].copy()
+
+        # Sarees etc use "FREE SIZE" / "ONE SIZE" which should match any requested size
+        UNIVERSAL_TOKENS = ("FREE SIZE", "ONE SIZE")
+
+        def _matches(sizes: list[str]) -> bool:
+            if not sizes:
+                return False
+            # Universal / one-size products match any size
+            if any(any(tok in s for tok in UNIVERSAL_TOKENS) for s in sizes):
+                return True
+            return any(a in sizes for a in aliases)
+
+        return df[df["available_sizes"].apply(_matches)].copy()
 
     def filter_by_price(
         self, df: pd.DataFrame, price_preference: Optional[dict]

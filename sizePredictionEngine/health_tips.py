@@ -19,7 +19,7 @@ def load_health_tips_env() -> None:
         logger.warning("Health tips .env file not found at %s", env_path)
         return
 
-    load_dotenv(env_path, override=True)
+    load_dotenv(env_path, override=False)
 
 
 load_health_tips_env()

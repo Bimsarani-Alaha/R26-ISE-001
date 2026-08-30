@@ -51,31 +51,35 @@ async def generate_stylist_tips(request: StylistRequest):
                 item = v.get("item", "")
                 color = v.get("color", "")
                 reason = v.get("reason", "")
-                parts = [item]
-                if color:
-                    parts[0] = f"{item} ({color})"
-                if reason:
-                    parts.append(reason)
-                return " — ".join(parts) if len(parts) > 1 else parts[0]
-            return str(v)
+                parts = [item.strip() if isinstance(item, str) else str(item)]
+                if color and str(color).strip():
+                    parts[0] = f"{parts[0]} ({str(color).strip()})"
+                if reason and str(reason).strip():
+                    parts.append(str(reason).strip())
+                formatted = " — ".join(p for p in parts if p)
+                return formatted
+            return str(v).strip()
 
         def to_str_list(val):
             if isinstance(val, list):
-                return [format_item(v) for v in val]
+                items = [format_item(v) for v in val]
+                return [x for x in items if x]
             if isinstance(val, dict):
-                return [format_item(v) for v in val.values()]
-            if isinstance(val, str) and val:
-                return [val]
+                items = [format_item(v) for v in val.values()]
+                return [x for x in items if x]
+            if isinstance(val, str) and val.strip():
+                return [val.strip()]
             return []
 
         progress.finish()
         return StylistResponse(
-            summary=result.get("summary", ""),
+            summary=str(result.get("summary", "")).strip(),
             accessories=to_str_list(result.get("accessories", [])),
             footwear=to_str_list(result.get("footwear", [])),
             color_combinations=to_str_list(result.get("color_combinations", [])),
-            occasion_tip=result.get("occasion_tip", ""),
-  
+            layering=to_str_list(result.get("layering", [])),
+            occasion_tip=str(result.get("occasion_tip", "")).strip(),
+            complementary_items=to_str_list(result.get("complementary_items", [])),
         )
     except HTTPException:
         progress.fail()
