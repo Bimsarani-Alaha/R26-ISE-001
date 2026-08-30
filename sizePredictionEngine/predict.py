@@ -10,9 +10,9 @@ image_path = "img63.jpeg"
 real_height = 182.88   # in centimeters
 
 
-model = YOLO(model_path)
+model = YOLO(model_path)#load the YOLOv8 model
 
-result = model(image_path, conf=0.8)[0]  # run pose detection
+result = model(image_path, conf=0.8)[0]  # run pose detection only keep 80% confidence detections
 
 # Draw detections
 annotated_img = result.plot()

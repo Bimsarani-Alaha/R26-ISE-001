@@ -10,7 +10,7 @@ if not os.path.exists(out_dir):
     os.makedirs(out_dir)#output directory for labels save
 
 file = minidom.parse('Anno171.xml')
-images = file.getElementsByTagName('image')
+images = file.getElementsByTagName('image') #find all image elements in the XML file
 
 for image in images:
 
