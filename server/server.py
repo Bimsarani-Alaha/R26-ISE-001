@@ -62,8 +62,10 @@ from sizeAnalyzer import get_size_label
 
 REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "styleRecommendationEngine"))
+sys.path.insert(0, os.path.join(REPO_ROOT, "AI Style Recommendation Model", "backend"))
 
 from src.api.app import app as styleanalyzer_app  # noqa: E402
+from app.main import app as fashion_recommendation_app  # noqa: E402
 
 
 app = FastAPI(
@@ -81,6 +83,7 @@ app.add_middleware(
 app.mount("/coloranalyzer", coloranalyzer_app)
 app.mount("/styleanalyzer", styleanalyzer_app)
 app.mount("/cvdmatcher", cvdmatcher_app)
+app.mount("/fashion-recommendation", fashion_recommendation_app)
 
 
 class HealthTipsRequest(BaseModel):
