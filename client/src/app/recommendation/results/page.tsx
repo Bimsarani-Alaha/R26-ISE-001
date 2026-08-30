@@ -17,7 +17,7 @@ const API_BASE_URL =
 
 export default function RecommendationResultsPage() {
   const router = useRouter();
-  const { productResults, requirements, gender, size } = useAppStore();
+  const { productResults, requirements, gender, size, hydrated } = useAppStore();
   const [liked, setLiked] = useState<string[]>([]);
 
   const toggleLike = (id: string) => {
@@ -32,6 +32,14 @@ export default function RecommendationResultsPage() {
     const cleaned = imagePath.replace("Images/", "").replace("images/", "");
     return `${API_BASE_URL}/fashion-recommendation/images/${cleaned}`;
   };
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-[#888] text-sm" style={SANS}>Loading your curated looks…</p>
+      </div>
+    );
+  }
 
   if (productResults.length === 0) {
     return (
@@ -137,6 +145,13 @@ export default function RecommendationResultsPage() {
                     src={getImageUrl(item.image_path)}
                     alt={item.article_type}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (img.dataset.fallback !== "true") {
+                        img.dataset.fallback = "true";
+                        img.src = `${API_BASE_URL}/fashion-recommendation/images/placeholder.jpg`;
+                      }
+                    }}
                   />
 
                   {/* LIKE BUTTON */}
@@ -241,7 +256,7 @@ export default function RecommendationResultsPage() {
                         className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
                         style={SANS}
                       >
-                        ${item.price.toFixed(0)}
+                        Rs. {item.price.toLocaleString("en-LK")}
                       </Badge>
                     )}
                   </div>

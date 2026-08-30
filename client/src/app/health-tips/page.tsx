@@ -44,7 +44,7 @@ export default function HealthTipsPage() {
       gender: bodyMeasurements.gender,
       clothing_size: bodyMeasurements.clothingSize,
     })
-      .then((result) => {
+      .then((result: { guidance: string }) => {
         if (!cancelled) setGuidance(result.guidance);
       })
       .catch((requestError: unknown) => {
@@ -74,7 +74,7 @@ export default function HealthTipsPage() {
       gender: bodyMeasurements.gender,
       clothing_size: bodyMeasurements.clothingSize,
     })
-      .then((result) => setGuidance(result.guidance))
+      .then((result: { guidance: string }) => setGuidance(result.guidance))
       .catch((requestError: unknown) => {
         const message =
           requestError instanceof Error ? requestError.message : "Unable to generate body guidance.";

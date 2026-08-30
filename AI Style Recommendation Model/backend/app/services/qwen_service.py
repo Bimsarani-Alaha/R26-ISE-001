@@ -37,9 +37,12 @@ class QwenService:
                 payload["images"] = encoded_images
 
         headers = {"ngrok-skip-browser-warning": "true"}
+        # qwen3-vl:8b via ngrok + Colab is slow (cold start >60s, VL+ngrok overhead)
+        # Use 180s for all to avoid "Model request timed out" on POST /recommendations
+        timeout = 180.0
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/generate")
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/generate (timeout={timeout}s)")
                 response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, headers=headers)
                 response.raise_for_status()
                 result = response.json()

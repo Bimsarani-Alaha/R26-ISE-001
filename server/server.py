@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 # MongoDB connection setup
 load_dotenv()
+# also load the AI Style Recommendation Model backend env so QWEN_MODEL / OLLAMA_BASE_URL stay in sync
+# (single source of truth if you only update backend/.env)
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / "AI Style Recommendation Model" / "backend" / ".env", override=False)
 
 MONGODB_URI = os.getenv("MONGODB_URI") or ""
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE") or "fashion_stylist"
@@ -66,8 +69,26 @@ REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "styleRecommendationEngine"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "AI Style Recommendation Model", "backend"))
 
-from src.api.app import app as styleanalyzer_app  # noqa: E402
-from app.main import app as fashion_recommendation_app  # noqa: E402
+# Optional mounts — make them resilient if the expected modules are missing
+try:
+    from src.api.app import app as styleanalyzer_app  # noqa: E402
+except Exception as _e:
+    logger.warning("styleanalyzer_app unavailable (%s); mounting dummy app", _e)
+    styleanalyzer_app = FastAPI(title="StyleAnalyzer (unavailable)")
+
+    @styleanalyzer_app.get("/")
+    async def _styleanalyzer_unavailable():
+        return {"status": "unavailable", "detail": "styleanalyzer module not found in this checkout"}
+
+try:
+    from app.main import app as fashion_recommendation_app  # noqa: E402
+except Exception as _e:
+    logger.warning("fashion_recommendation_app unavailable (%s); mounting dummy app", _e)
+    fashion_recommendation_app = FastAPI(title="Fashion Recommendation (unavailable)")
+
+    @fashion_recommendation_app.get("/")
+    async def _fashion_unavailable():
+        return {"status": "unavailable", "detail": "fashion recommendation module not found"}
 
 
 app = FastAPI(
