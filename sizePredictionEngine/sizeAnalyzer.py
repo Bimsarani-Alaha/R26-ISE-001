@@ -41,7 +41,7 @@ def _build_charts(data: list[tuple[str, float, float, str]]) -> dict[str, list[d
     return charts
 
 
-CHARTS = _build_charts(TRAINING_DATA)
+CHARTS = _build_charts(TRAINING_DATA) #build a model for each gender and size based on the training
 
 
 def normalize_gender(gender: str) -> str:
