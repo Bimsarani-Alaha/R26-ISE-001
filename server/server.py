@@ -1,7 +1,9 @@
+import asyncio
 import base64
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -85,6 +87,11 @@ class HealthTipsRequest(BaseModel):
     clothing_size: str = "unspecified"
 
 
+HEALTH_TIPS_CACHE_SECONDS = float(os.getenv("HEALTH_TIPS_CACHE_SECONDS", "900"))
+health_tips_cache: dict[tuple[float, float, float, str, str], tuple[float, str]] = {}
+health_tips_request_lock = asyncio.Lock()
+
+
 class UserRequest(BaseModel):
     name: str | None = None
     phone: str | None = None
@@ -136,24 +143,44 @@ async def save_system(payload: UserRequest) -> dict:
 
 @app.post("/api/health-tips")
 async def health_tips(request: HealthTipsRequest) -> dict[str, str]:
-    try:
-        guidance = await generate_health_tips(
-            shoulder_width=request.shoulder_width,
-            hip_size=request.hip_size,
-            height=request.height,
-            gender=request.gender,
-            clothing_size=request.clothing_size,
-        )
-    except HealthTipsConfigurationError as error:
-        logger.error("Health tips service configuration error: %s", error)
-        raise HTTPException(status_code=503, detail="The guidance service is not configured.") from error
-    except Exception as error:
-        logger.exception("Health tips service request failed")
-        raise HTTPException(status_code=502, detail="The guidance service is unavailable.") from error
+    cache_key = (
+        request.shoulder_width,
+        request.hip_size,
+        request.height,
+        request.gender,
+        request.clothing_size,
+    )
 
-    if not guidance:
-        logger.error("Health tips service returned an empty response")
-        raise HTTPException(status_code=502, detail="The guidance service returned an empty response.")
+    async with health_tips_request_lock:
+        cached = health_tips_cache.get(cache_key)
+        if cached and cached[0] > time.monotonic():
+            return {"guidance": cached[1]}
+
+        try:
+            guidance = await generate_health_tips(
+                shoulder_width=request.shoulder_width,
+                hip_size=request.hip_size,
+                height=request.height,
+                gender=request.gender,
+                clothing_size=request.clothing_size,
+            )
+        except HealthTipsConfigurationError as error:
+            logger.error("Health tips service configuration error: %s", error)
+            raise HTTPException(status_code=503, detail="The guidance service is not configured.") from error
+        except Exception as error:
+            logger.exception("Health tips service request failed")
+            if "ollama" in str(error).lower() or "localhost:11434" in str(error).lower():
+                raise HTTPException(
+                    status_code=503,
+                    detail="The local Ollama guidance service is unavailable. Please start the qwen2.5:3b model in Ollama.",
+                ) from error
+            raise HTTPException(status_code=502, detail="The guidance service is unavailable.") from error
+
+        if not guidance:
+            logger.error("Health tips service returned an empty response")
+            raise HTTPException(status_code=502, detail="The guidance service returned an empty response.")
+
+        health_tips_cache[cache_key] = (time.monotonic() + HEALTH_TIPS_CACHE_SECONDS, guidance)
 
     return {"guidance": guidance}
 
