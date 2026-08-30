@@ -1,9 +1,12 @@
 import json
 import httpx
 import base64
+import logging
 from pathlib import Path
 from typing import Optional
 from ..config import OLLAMA_BASE_URL, QWEN_MODEL, PROMPTS_DIR, IMAGES_DIR
+
+logger = logging.getLogger(__name__)
 
 
 class QwenService:
@@ -33,11 +36,23 @@ class QwenService:
             if encoded_images:
                 payload["images"] = encoded_images
 
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload)
-            response.raise_for_status()
-            result = response.json()
-            return result.get("response", "")
+        headers = {"ngrok-skip-browser-warning": "true"}
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/generate")
+                response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "")
+        except httpx.TimeoutException:
+            logger.error("Ollama request timed out")
+            return json.dumps({"error": "Model request timed out. Please try again."})
+        except httpx.ConnectError:
+            logger.error("Cannot connect to Ollama")
+            return json.dumps({"error": "Cannot connect to the model. Please check if Ollama is running."})
+        except Exception as e:
+            logger.error(f"Ollama request failed: {e}")
+            return json.dumps({"error": f"Model request failed: {str(e)}"})
 
     async def analyze_requirements(self, requirements_text: str) -> dict:
         full_prompt = f"{self.requirement_prompt}\n\nCustomer request:\n{requirements_text}"
@@ -100,10 +115,21 @@ class QwenService:
 
     async def check_connection(self) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
-                return response.status_code == 200
-        except Exception:
+            headers = {"ngrok-skip-browser-warning": "true"}
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{OLLAMA_BASE_URL}/api/tags", headers=headers)
+                if response.status_code != 200:
+                    logger.warning(f"Ollama returned status {response.status_code}")
+                    return False
+                content_type = response.headers.get("content-type", "")
+                if "application/json" not in content_type:
+                    logger.warning(f"Ollama returned non-JSON response (Content-Type: {content_type})")
+                    return False
+                data = response.json()
+                models = data.get("models", [])
+                return any(m.get("name") == QWEN_MODEL for m in models)
+        except Exception as e:
+            logger.warning(f"Ollama connection check failed: {e}")
             return False
 
 
