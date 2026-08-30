@@ -13,18 +13,7 @@ export default function HomePage() {
     <div className="min-h-screen w-full bg-white flex flex-col">
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 md:px-16 py-6 border-b border-[#e8e8e8]">
-        <div className="flex items-center gap-8">
-          {["WOMEN", "MEN", "OCCASION"].map((item) => (
-            <button
-              key={item}
-              type="button"
-              className="text-[#111] text-xs tracking-[0.15em] hover:text-[#888] transition-colors hidden md:block"
-              style={{ ...SANS, fontWeight: 400 }}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+        {/* co */}
         <div className="text-center">
           <StyleAiWordmark className="text-2xl" />
         </div>
@@ -114,7 +103,7 @@ export default function HomePage() {
                 className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-[#111] px-7 py-3 text-xs tracking-[0.2em] hover:bg-white transition-all duration-300"
                 style={{ ...SANS, fontWeight: 400 }}
               >
-                START NOW
+                Get Reccommendations
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </motion.button>
             </div>
