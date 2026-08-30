@@ -146,7 +146,7 @@ export default function ClothingMatcher() {
           >
             CVD Clothing Matcher
           </h1> */}
-          <p className="text-s text-[#888]" style={{ ...SANS, fontWeight: 300 }}>
+          <p className="text-s text-[#111]" style={{ ...SANS, fontWeight: 300 }}>
             Upload your top and bottom clothing to check how well they match.
           </p>
         </div>
@@ -213,7 +213,7 @@ export default function ClothingMatcher() {
               >
                 UPLOAD CLOTHING IMAGES
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4 pt-5">
                 {(["top", "bottom"] as const).map((which) => {
                   const preview = which === "top" ? topPreview : botPreview;
                   const inputRef = which === "top" ? topRef : botRef;
@@ -221,7 +221,7 @@ export default function ClothingMatcher() {
                   return (
                     <div key={which} className="flex flex-col gap-1.5">
                       <span
-                        className="text-[10px] text-center tracking-[0.15em] text-[#999]"
+                        className="text-[10px] text-center tracking-[0.15em] text-[#111]"
                         style={SANS}
                       >
                         {label.toUpperCase()}
@@ -470,7 +470,7 @@ export default function ClothingMatcher() {
                       </div>
 
                       <p className="text-xs text-center" style={{ ...SANS, fontWeight: 300, color: "#888" }}>
-                        Delta E score:{" "}
+                        Matching score:{" "}
                         <span className="font-medium" style={{ color: "#111" }}>
                           {result.delta_e}
                         </span>
@@ -503,16 +503,16 @@ export default function ClothingMatcher() {
                         ok={!result.top_hard}
                         text={
                           result.top_hard
-                            ? `Top (${result.top_color.name}) — hard to distinguish under ${result.cvd_type}.`
-                            : `Top (${result.top_color.name}) — distinguishable under ${result.cvd_type}.`
+                            ? `Top — hard to distinguish under ${result.cvd_type}.`
+                            : `Top  — distinguishable under ${result.cvd_type}.`
                         }
                       />
                       <DistRow
                         ok={!result.bottom_hard}
                         text={
                           result.bottom_hard
-                            ? `Bottom (${result.bottom_color.name}) — hard to distinguish under ${result.cvd_type}.`
-                            : `Bottom (${result.bottom_color.name}) — distinguishable under ${result.cvd_type}.`
+                            ? `Bottom — hard to distinguish under ${result.cvd_type}.`
+                            : `Bottom — distinguishable under ${result.cvd_type}.`
                         }
                       />
                     </>
