@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { ClothingItem } from "@/app/data/recommendations";
 import type { BackendPrediction } from "@/app/lib/recommendationApi";
-import type { ProductResult } from "@/app/lib/aiStyleApi";
+import type { GetStylistResponse, ProductResult } from "@/app/lib/aiStyleApi";
 
 const GENDER_STORAGE_KEY = "styleai-gender";
 const BODY_MEASUREMENTS_STORAGE_KEY = "styleai-body-measurements";
@@ -21,6 +21,7 @@ const PRODUCT_RESULTS_STORAGE_KEY = "styleai-product-results";
 const PREDICTION_STORAGE_KEY = "styleai-prediction";
 const RECOMMENDATIONS_STORAGE_KEY = "styleai-recommendations";
 const COLOR_PREF_STORAGE_KEY = "styleai-color-pref";
+const STYLIST_TIPS_STORAGE_KEY = "styleai-stylist-tips";
 
 const readStorageValue = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") {
@@ -49,6 +50,7 @@ type AppStore = {
   productResults: ProductResult[];
   bodyMeasurements: BodyMeasurements | null;
   colorPreference: string;
+  stylistTipsCache: Record<string, GetStylistResponse>;
   hydrated: boolean;
   setRequirements: (v: string) => void;
   setOccasion: (v: string) => void;
@@ -59,6 +61,8 @@ type AppStore = {
   setProductResults: (v: ProductResult[]) => void;
   setBodyMeasurements: (v: BodyMeasurements | null) => void;
   setColorPreference: (v: string) => void;
+  setStylistTipsCache: (v: Record<string, GetStylistResponse>) => void;
+  setStylistTip: (productId: string, tip: GetStylistResponse | null) => void;
 };
 
 export type BodyMeasurements = {
@@ -81,6 +85,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [recommendations, setRecommendations] = useState<ClothingItem[]>([]);
   const [productResults, setProductResults] = useState<ProductResult[]>([]);
   const [bodyMeasurements, setBodyMeasurementsState] = useState<BodyMeasurements | null>(null);
+  const [stylistTipsCache, setStylistTipsCache] = useState<Record<string, GetStylistResponse>>({});
   const [hydrated, setHydrated] = useState(false);
 
   // Hydrate from localStorage after mount to avoid SSR mismatch
@@ -94,6 +99,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setPrediction(readStorageValue<BackendPrediction | null>(PREDICTION_STORAGE_KEY, null));
     setRecommendations(readStorageValue<ClothingItem[]>(RECOMMENDATIONS_STORAGE_KEY, []));
     setProductResults(readStorageValue<ProductResult[]>(PRODUCT_RESULTS_STORAGE_KEY, []));
+    setStylistTipsCache(readStorageValue<Record<string, GetStylistResponse>>(STYLIST_TIPS_STORAGE_KEY, {}));
     setHydrated(true);
   }, []);
 
@@ -149,12 +155,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(PRODUCT_RESULTS_STORAGE_KEY, JSON.stringify(productResults));
   }, [productResults, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem(STYLIST_TIPS_STORAGE_KEY, JSON.stringify(stylistTipsCache));
+  }, [stylistTipsCache, hydrated]);
+
   const setGender = (v: string) => {
     setGenderState(v);
   };
 
   const setBodyMeasurements = (v: BodyMeasurements | null) => {
     setBodyMeasurementsState(v);
+  };
+
+  const setStylistTip = (productId: string, tip: GetStylistResponse | null) => {
+    setStylistTipsCache((prev) => {
+      if (tip === null) {
+        const { [productId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [productId]: tip };
+    });
   };
 
   const value = useMemo(
@@ -168,6 +189,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       productResults,
       bodyMeasurements,
       colorPreference,
+      stylistTipsCache,
       hydrated,
       setRequirements,
       setOccasion,
@@ -178,6 +200,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setProductResults,
       setBodyMeasurements,
       setColorPreference,
+      setStylistTipsCache,
+      setStylistTip,
     }),
     [
       requirements,
@@ -189,6 +213,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       productResults,
       bodyMeasurements,
       colorPreference,
+      stylistTipsCache,
       hydrated,
     ],
   );
