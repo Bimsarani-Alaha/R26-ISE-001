@@ -2,8 +2,8 @@
 
 import { ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
@@ -24,12 +24,127 @@ const EXAMPLE_PROMPTS = [
 
 export default function RecommendationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromSize = searchParams.get("from") === "size";
   const store = useAppStore();
-  const [step, setStep] = useState(1);
   const [gender, setGender] = useState(store.gender || "");
   const [size, setSize] = useState(store.size || "");
-  const [requirements, setRequirements] = useState(store.requirements || "");
-  const [charCount, setCharCount] = useState(requirements.length);
+  const [requirements, setRequirements] = useState("");
+  const [charCount, setCharCount] = useState(0);
+
+  // Pre-select from size prediction (localStorage via AppStoreContext)
+  const mapPredictedGender = (g: string) => {
+    const v = g.trim().toLowerCase();
+    if (v === "men" || v === "male") return "Male";
+    if (v === "women" || v === "female") return "Female";
+    if (v === "unisex") return "Unisex";
+    return g;
+  };
+
+  useEffect(() => {
+    if (!store.hydrated) return;
+    // styleai-gender uses Women/Men, recommendation uses Male/Female/Unisex — map it
+    // Also handles direct localStorage edits (with or without JSON.stringify)
+    const readRawGender = (): string | null => {
+      try {
+        const raw = window.localStorage.getItem("styleai-gender");
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          return typeof parsed === "string" ? parsed : raw;
+        } catch {
+          return raw.replace(/^"|"$/g, "");
+        }
+      } catch {
+        return null;
+      }
+    };
+    const readRawSize = (): string | null => {
+      try {
+        const raw = window.localStorage.getItem("styleai-size");
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          return typeof parsed === "string" ? parsed : raw;
+        } catch {
+          return raw.replace(/^"|"$/g, "");
+        }
+      } catch {
+        return null;
+      }
+    };
+    const readRawBodyMeasurements = (): { gender?: string; clothingSize?: string } | null => {
+      try {
+        const raw = window.localStorage.getItem("styleai-body-measurements");
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+    // /size → Fashion Recommendation (?from=size) auto-fills from bodyMeasurements; homepage flow stays free
+    if (!gender && fromSize) {
+      if (store.bodyMeasurements?.gender) {
+        const mapped = mapPredictedGender(store.bodyMeasurements.gender);
+        if (GENDERS.includes(mapped)) {
+          setGender(mapped);
+          const mappedStore = store.gender ? mapPredictedGender(store.gender) : null;
+          if (mappedStore !== mapped) store.setGender(mapped);
+        }
+      } else {
+        const rawBody = readRawBodyMeasurements();
+        if (rawBody?.gender) {
+          const mapped = mapPredictedGender(rawBody.gender);
+          if (GENDERS.includes(mapped)) {
+            setGender(mapped);
+            const mappedStore = store.gender ? mapPredictedGender(store.gender) : null;
+            if (mappedStore !== mapped) store.setGender(mapped);
+          }
+        } else if (store.gender) {
+          const mappedStoreGender = mapPredictedGender(store.gender);
+          if (GENDERS.includes(mappedStoreGender)) setGender(mappedStoreGender);
+          else if (GENDERS.includes(store.gender)) setGender(store.gender);
+        } else {
+          const rawGender = readRawGender();
+          if (rawGender) {
+            const mapped = mapPredictedGender(rawGender);
+            if (GENDERS.includes(mapped)) setGender(mapped);
+          }
+        }
+      }
+    }
+    if (!size && fromSize) {
+      if (store.bodyMeasurements?.clothingSize) {
+        const predictedSize = store.bodyMeasurements.clothingSize.trim().toUpperCase();
+        if (SIZES.includes(predictedSize)) {
+          setSize(predictedSize);
+          if (store.size !== predictedSize) store.setSize(predictedSize);
+        }
+      } else {
+        const rawBody = readRawBodyMeasurements();
+        if (rawBody?.clothingSize) {
+          const predictedSize = rawBody.clothingSize.trim().toUpperCase();
+          if (SIZES.includes(predictedSize)) {
+            setSize(predictedSize);
+            if (store.size !== predictedSize) store.setSize(predictedSize);
+          }
+        } else if (store.size) {
+          const normalizedSize = store.size.trim().toUpperCase();
+          if (SIZES.includes(normalizedSize)) setSize(normalizedSize);
+        } else {
+          const rawSize = readRawSize();
+          if (rawSize && SIZES.includes(rawSize.trim().toUpperCase())) {
+            setSize(rawSize.trim().toUpperCase());
+          }
+        }
+      }
+    }
+  }, [store.hydrated, store.bodyMeasurements, store.gender, store.size, gender, size, fromSize]);
+
+  const predictedGender = fromSize && store.bodyMeasurements?.gender ? mapPredictedGender(store.bodyMeasurements.gender) : null;
+  const predictedSize = fromSize && store.bodyMeasurements?.clothingSize?.trim().toUpperCase() ? store.bodyMeasurements.clothingSize.trim().toUpperCase() : null;
+  const genderFromPrediction = fromSize && !!predictedGender && gender === predictedGender;
+  const sizeFromPrediction = fromSize && !!predictedSize && size === predictedSize;
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setRequirements(e.target.value);
@@ -45,9 +160,7 @@ export default function RecommendationPage() {
     router.push("/recommendation/loading");
   };
 
-  const isValidStep1 = gender.length > 0;
-  const isValidStep2 = size.length > 0;
-  const isValidStep3 = requirements.trim().length > 0;
+  const isValid = gender.length > 0 && size.length > 0 && requirements.trim().length > 0;
 
   const FilterChip = ({
     label,
@@ -84,39 +197,37 @@ export default function RecommendationPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="mb-12 text-center"
+          className="mb-10 text-center"
         >
-          <p className="text-xs tracking-[0.3em] text-[#aaa] mb-4" style={SANS}>
-            STEP {step} OF 3
-          </p>
           <h1
             className="text-4xl md:text-5xl text-[#111] tracking-wide mb-4"
             style={{ ...SERIF, fontWeight: 300 }}
           >
-            {step === 1
-              ? "Who's Shopping?"
-              : step === 2
-                ? "What's Your Size?"
-                : "Describe Your Outfit"}
+            Describe Your Outfit
           </h1>
           <p className="text-sm text-[#888] tracking-wide" style={SANS}>
-            {step === 1
-              ? "Select the gender you're shopping for."
-              : step === 2
-                ? "Choose your clothing size."
-                : "Mention the color, dress type, and any other requirements."}
+            Choose gender, size and describe your outfit in one place.
           </p>
         </motion.div>
 
-        {step === 1 ? (
-          /* STEP 1: GENDER */
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="mb-12"
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.12 }}
+          className="space-y-8"
+        >
+          {/* Gender + Size on same page — prefilled from size prediction if available */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="block text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
+                GENDER
+              </p>
+              {genderFromPrediction && (
+                <span className="text-[9px] tracking-[0.15em] bg-[#fef9e7] border border-[#f0d97a] px-2 py-0.5 text-[#6b5900]" style={SANS}>
+                  FROM SIZE PREDICTION
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {GENDERS.map((g) => (
                 <FilterChip
@@ -127,41 +238,19 @@ export default function RecommendationPage() {
                 />
               ))}
             </div>
+          </div>
 
-            <Button
-              type="button"
-              onClick={() => setStep(2)}
-              disabled={!isValidStep1}
-              variant="default"
-              className={`w-full mt-10 py-4 text-xs tracking-[0.25em] flex items-center justify-center gap-3 transition-all duration-300 rounded-none h-auto ${
-                isValidStep1
-                  ? "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
-                  : "bg-[#f0f0f0] text-[#ccc] cursor-not-allowed hover:bg-[#f0f0f0]"
-              }`}
-              style={SANS}
-            >
-              CONTINUE
-              {isValidStep1 && <ArrowUpRight className="w-4 h-4" />}
-            </Button>
-          </motion.div>
-        ) : step === 2 ? (
-          /* STEP 2: SIZE */
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="mb-12"
-          >
-            <div className="mb-6 text-center">
-              <span
-                className="text-[10px] tracking-[0.25em] text-[#888]"
-                style={SANS}
-              >
-                GENDER: {gender.toUpperCase()}
-              </span>
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="block text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
+                SIZE
+              </p>
+              {sizeFromPrediction && (
+                <span className="text-[9px] tracking-[0.15em] bg-[#fef9e7] border border-[#f0d97a] px-2 py-0.5 text-[#6b5900]" style={SANS}>
+                  FROM SIZE PREDICTION
+                </span>
+              )}
             </div>
-
             <div className="flex flex-wrap gap-2">
               {SIZES.map((s) => (
                 <FilterChip
@@ -172,56 +261,9 @@ export default function RecommendationPage() {
                 />
               ))}
             </div>
+          </div>
 
-            <div className="mt-10 flex flex-col gap-4">
-              <Button
-                type="button"
-                onClick={() => setStep(3)}
-                disabled={!isValidStep2}
-                variant="default"
-                className={`w-full py-4 text-xs tracking-[0.25em] flex items-center justify-center gap-3 transition-all duration-300 rounded-none h-auto ${
-                  isValidStep2
-                    ? "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
-                    : "bg-[#f0f0f0] text-[#ccc] cursor-not-allowed hover:bg-[#f0f0f0]"
-                }`}
-                style={SANS}
-              >
-                CONTINUE
-                {isValidStep2 && <ArrowUpRight className="w-4 h-4" />}
-              </Button>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-xs tracking-[0.15em] text-[#888] hover:text-[#111] transition-colors underline underline-offset-2 self-center"
-                style={SANS}
-              >
-                ← BACK TO GENDER
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          /* STEP 3: FREE TEXT */
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-          >
-            <div className="mb-8 text-center flex flex-wrap justify-center gap-4">
-              <span
-                className="text-[10px] tracking-[0.25em] text-[#888]"
-                style={SANS}
-              >
-                GENDER: {gender.toUpperCase()}
-              </span>
-              <span
-                className="text-[10px] tracking-[0.25em] text-[#888]"
-                style={SANS}
-              >
-                SIZE: {size.toUpperCase()}
-              </span>
-            </div>
-
+          <div>
             <label
               htmlFor="outfit-needs"
               className="block text-[10px] tracking-[0.25em] text-[#aaa] mb-3"
@@ -231,7 +273,7 @@ export default function RecommendationPage() {
             </label>
             <div
               className={`relative border transition-colors duration-200 ${
-                isValidStep3 ? "border-[#111]" : "border-[#ddd]"
+                requirements.trim().length > 0 ? "border-[#111]" : "border-[#ddd]"
               } focus-within:border-[#111]`}
             >
               <Textarea
@@ -250,7 +292,7 @@ export default function RecommendationPage() {
                 <span className="text-[#ccc] text-xs" style={SANS}>
                   {charCount}/500
                 </span>
-                {isValidStep3 && (
+                {requirements.trim().length > 0 && (
                   <Badge
                     variant="outline"
                     className="text-[10px] tracking-[0.15em] text-[#111] border-0 bg-transparent px-0 py-0"
@@ -287,35 +329,30 @@ export default function RecommendationPage() {
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Back + Submit */}
-            <div className="mt-10 flex flex-col gap-4">
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!isValidStep3}
-                variant="default"
-                className={`w-full py-4 text-xs tracking-[0.25em] flex items-center justify-center gap-3 transition-all duration-300 rounded-none h-auto ${
-                  isValidStep3
-                    ? "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
-                    : "bg-[#f0f0f0] text-[#ccc] cursor-not-allowed hover:bg-[#f0f0f0]"
-                }`}
-                style={SANS}
-              >
-                GET RECOMMENDATIONS
-                {isValidStep3 && <ArrowUpRight className="w-4 h-4" />}
-              </Button>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="text-xs tracking-[0.15em] text-[#888] hover:text-[#111] transition-colors underline underline-offset-2 self-center"
-                style={SANS}
-              >
-                ← BACK TO SIZE
-              </button>
-            </div>
-          </motion.div>
-        )}
+          {/* Submit */}
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!isValid}
+            variant="default"
+            className={`w-full py-4 text-xs tracking-[0.25em] flex items-center justify-center gap-3 transition-all duration-300 rounded-none h-auto ${
+              isValid
+                ? "bg-[#111] text-white hover:bg-[#333] active:scale-[0.98]"
+                : "bg-[#f0f0f0] text-[#ccc] cursor-not-allowed hover:bg-[#f0f0f0]"
+            }`}
+            style={SANS}
+          >
+            GET RECOMMENDATIONS
+            {isValid && <ArrowUpRight className="w-4 h-4" />}
+          </Button>
+          {!isValid && (
+            <p className="text-[10px] tracking-[0.15em] text-[#bbb] text-center" style={SANS}>
+              {!gender ? "Select gender" : !size ? "Select size" : "Describe your outfit"}
+            </p>
+          )}
+        </motion.div>
       </div>
     </div>
   );

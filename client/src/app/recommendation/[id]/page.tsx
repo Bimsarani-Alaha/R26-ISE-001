@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
@@ -58,7 +58,7 @@ const colorDots: Record<string, string> = {
 export default function RecommendationDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { productResults, requirements, gender, size, hydrated } = useAppStore();
+  const { productResults, requirements, gender, size, hydrated, stylistTipsCache, setStylistTip } = useAppStore();
   const [liked, setLiked] = useState(false);
   const [stylistTips, setStylistTips] = useState<GetStylistResponse | null>(
     null,
@@ -67,6 +67,15 @@ export default function RecommendationDetailPage() {
   const [tipsError, setTipsError] = useState("");
 
   const itemId = Array.isArray(id) ? id[0] : id;
+
+  // Restore cached tips on refresh / back navigation — no re-analyze
+  useEffect(() => {
+    if (!hydrated || !itemId) return;
+    const cached = stylistTipsCache[itemId];
+    if (cached && !stylistTips) {
+      setStylistTips(cached);
+    }
+  }, [hydrated, itemId, stylistTipsCache, stylistTips]);
 
   if (!hydrated) {
     return (
@@ -100,8 +109,16 @@ export default function RecommendationDetailPage() {
   }
 
   const handleGetStylistTips = async () => {
+    // Hide without deleting cache — back/refresh restores instantly
     if (stylistTips) {
       setStylistTips(null);
+      return;
+    }
+
+    // If cached for this product, show instantly without re-analyze
+    const cached = itemId ? stylistTipsCache[itemId] : null;
+    if (cached) {
+      setStylistTips(cached);
       return;
     }
 
@@ -116,6 +133,7 @@ export default function RecommendationDetailPage() {
         product_id: itemId ?? "",
       });
       setStylistTips(tips);
+      if (itemId) setStylistTip(itemId, tips);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load styling tips";
@@ -271,14 +289,6 @@ export default function RecommendationDetailPage() {
                 >
                   Rs. {item.price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                 </span>
-                {originalPrice && (
-                  <span
-                    className="text-sm text-[#bbb] line-through"
-                    style={SANS}
-                  >
-                    Rs. {Number(originalPrice).toLocaleString("en-LK", { minimumFractionDigits: 2 })}
-                  </span>
-                )}
               </div>
             )}
 
@@ -400,25 +410,7 @@ export default function RecommendationDetailPage() {
               </motion.div>
             )}
 
-            {/* Wishlist */}
-            <div className="flex">
-              <Button
-                type="button"
-                onClick={() => setLiked(!liked)}
-                variant="outline"
-                className={`w-full py-3.5 text-xs tracking-[0.2em] flex items-center justify-center gap-2 rounded-none h-auto ${
-                  liked
-                    ? "border-[#111] bg-[#111] text-white hover:bg-[#111]"
-                    : "border-[#ddd] text-[#555] hover:border-[#111] hover:text-[#111] hover:bg-transparent"
-                }`}
-                style={SANS}
-              >
-                <Heart
-                  className={`w-4 h-4 ${liked ? "fill-white text-white" : "text-[#888]"}`}
-                />
-                {liked ? "WISHLISTED" : "ADD TO WISHLIST"}
-              </Button>
-            </div>
+
           </motion.div>
         </div>
 
@@ -512,20 +504,7 @@ export default function RecommendationDetailPage() {
                 </div>
               )}
 
-              {/* Layering */}
-              {stylistTips.layering.length > 0 && (
-                <div className="p-6 md:p-8 border-b border-[#e8e8e8] bg-white">
-                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>LAYERING</p>
-                  <ul className="space-y-3">
-                    {stylistTips.layering.map((tip) => (
-                      <li key={tip} className="flex items-start gap-3 text-sm text-[#333] leading-relaxed" style={SANS}>
-                        <span className="mt-1.5 w-1.5 h-1.5 bg-[#111] rounded-full flex-shrink-0" />
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              
 
               {/* Occasion Tip — full width inside grid */}
               {stylistTips.occasion_tip && (
@@ -537,20 +516,7 @@ export default function RecommendationDetailPage() {
                 </div>
               )}
 
-              {/* Complementary Items — visual badges */}
-              {stylistTips.complementary_items.length > 0 && (
-                <div className="p-6 md:p-8 bg-white md:col-span-2">
-                  <p className="text-[10px] tracking-[0.2em] text-[#aaa] mb-4" style={SANS}>COMPLEMENTARY ITEMS</p>
-                  <div className="flex flex-wrap gap-2">
-                    {stylistTips.complementary_items.map((it) => (
-                      <span key={it} className="inline-flex items-center gap-2 border border-[#111] bg-white px-4 py-2 text-xs tracking-wide text-[#111]" style={SANS}>
-                        <span className="w-1.5 h-1.5 bg-[#111] rounded-full" />
-                        {it}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              
             </div>
           </motion.div>
         )}
