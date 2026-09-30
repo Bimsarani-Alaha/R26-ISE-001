@@ -7,11 +7,20 @@ ARTICLE_SYNONYMS = {
     "trousers": ["pants", "trouser"],
     "trouser": ["pants", "trousers"],
     "t-shirt": ["tee", "teeshirt"],
-    "shirt": ["top"],
-    "top": ["shirt"],
+    "shirt": ["top", "blouse"],
+    "top": ["shirt", "blouse"],
+    "blouse": ["shirt", "top"],
     "shorts": ["short"],
     "jeans": ["denim"],
     "skirt": ["mini skirt", "midi skirt", "maxi skirt"],
+    "frock": ["dress", "gown", "frock dress"],
+    "frock dress": ["dress", "gown", "frock"],
+    "dress": ["frock", "gown", "frock dress"],
+    "gown": ["dress", "frock", "frock dress"],
+    "saree": ["sari"],
+    "sari": ["saree"],
+    "kurta": ["kurti", "kurta set"],
+    "kurti": ["kurta", "kurta set"],
 }
 
 SIZE_ALIASES = {

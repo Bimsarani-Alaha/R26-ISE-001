@@ -178,16 +178,7 @@ export default function RecommendationResultsPage() {
                     </span>
                   </button>
 
-                  {/* MATCH SCORE */}
-                  <div className="absolute top-3 left-3">
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] tracking-[0.2em] text-white bg-black/50 backdrop-blur-sm px-2 py-1 rounded-none border-0"
-                      style={SANS}
-                    >
-                      {Math.round(item.match_score * 100)}% MATCH
-                    </Badge>
-                  </div>
+                 
 
                   {/* CATEGORY */}
                   <div className="absolute bottom-3 left-3">
