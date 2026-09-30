@@ -19,7 +19,7 @@ type Measurement = {
 
 export default function SizePage() {
   const router = useRouter();
-  const { gender: savedGender, setBodyMeasurements, setGender } = useAppStore();
+  const { gender: savedGender, bodyMeasurements: savedBodyMeasurements, setBodyMeasurements, setGender, setSize } = useAppStore();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
@@ -170,13 +170,21 @@ export default function SizePage() {
 
       const firstMeasurement = data.measurements?.[0];
       if (firstMeasurement?.shoulder_cm && firstMeasurement?.hip_cm) {
+        const predictedSize = (firstMeasurement.size ?? "").toString().trim().toUpperCase() || "unspecified";
         setBodyMeasurements({
           shoulderCm: firstMeasurement.shoulder_cm,
           hipCm: firstMeasurement.hip_cm,
           heightCm: Number(height),
           gender,
-          clothingSize: firstMeasurement.size ?? "unspecified",
+          clothingSize: predictedSize,
         });
+        // keep styleai-size / styleai-gender in sync for /recommendation pre-select
+        if (predictedSize !== "unspecified") setSize(predictedSize);
+        setGender(gender);
+      } else if (firstMeasurement?.size) {
+        // fallback when cm missing but size present
+        const predictedSize = firstMeasurement.size.toString().trim().toUpperCase();
+        if (predictedSize) setSize(predictedSize);
       }
 
       if (!data.measurements || data.measurements.length === 0) {
@@ -188,6 +196,32 @@ export default function SizePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFashionRecommendation = () => {
+    // ensure current gender/size are persisted synchronously for /recommendation?from=size auto-select
+    setGender(gender);
+    try {
+      window.localStorage.setItem("styleai-gender", JSON.stringify(gender));
+    } catch {}
+    const predicted = measurements[0]?.size || savedBodyMeasurements?.clothingSize || null;
+    if (predicted) {
+      const normalized = predicted.toString().trim().toUpperCase();
+      if (["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"].includes(normalized)) {
+        setSize(normalized);
+        try {
+          window.localStorage.setItem("styleai-size", JSON.stringify(normalized));
+        } catch {}
+        // also ensure bodyMeasurements is in sync if needed
+        if (!savedBodyMeasurements || savedBodyMeasurements.clothingSize !== normalized) {
+          try {
+            const existing = savedBodyMeasurements || { shoulderCm: 0, hipCm: 0, heightCm: Number(height) || 0, gender, clothingSize: normalized };
+            window.localStorage.setItem("styleai-body-measurements", JSON.stringify({ ...existing, gender, clothingSize: normalized }));
+          } catch {}
+        }
+      }
+    }
+    router.push("/recommendation?from=size");
   };
 
   return (
@@ -268,14 +302,6 @@ export default function SizePage() {
                     Upload a full-body image, enter your real height, and receive refined measurements with the same calm, editorial experience as the rest of the platform.
                   </p>
                   <div className="mt-8 flex flex-wrap gap-3">
-                    <Button
-                      onClick={() => router.push("/input")}
-                      className="flex items-center gap-2 rounded-none border border-white bg-white px-6 py-3 text-[11px] tracking-[0.2em] text-[#111] transition-all hover:bg-[#f2f2f2]"
-                      style={{ ...SANS, fontWeight: 400 }}
-                    >
-                      START NOW
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </Button>
                     <Button
                       onClick={() => router.push("/")}
                       variant="ghost"
@@ -630,13 +656,22 @@ export default function SizePage() {
           </div>
         </section>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button
             onClick={() => router.push("/health-tips")}
             className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-colors hover:bg-[#333]"
             style={{ ...SANS, fontWeight: 400 }}
           >
             BODY APPEARANCE GUIDE
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            onClick={handleFashionRecommendation}
+            variant="outline"
+            className="h-auto flex items-center gap-2 rounded-none border-[#111] bg-white px-4 py-3 text-[11px] tracking-[0.2em] text-[#111] transition-colors hover:bg-[#111] hover:text-white"
+            style={{ ...SANS, fontWeight: 400 }}
+          >
+            FASHION RECOMMENDATION
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
         </div>
