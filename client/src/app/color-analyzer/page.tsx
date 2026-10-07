@@ -1,5 +1,6 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
@@ -8,16 +9,21 @@ import { ColorTab } from "../components/ColorAnalyzer/ColorTab";
 import { CvdTab } from "../components/ColorAnalyzer/CvdTab";
 import { PatternTab } from "../components/ColorAnalyzer/PatternTab";
 
+
 const TABS = [
   { id: "color", label: "COLOR" },
   { id: "cvd", label: "CVD" },
-  { id: "pattern", label: "PATTERN" },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof TABS)[number]["id"] | "pattern";
+
+
+const FEATURE_LABEL = "FEATURE";
 
 export default function ColorAnalyzerPage() {
   const [active, setActive] = useState<TabId>("color");
+
+  const featureActive = active === "pattern";
 
   return (
     <div className="min-h-screen w-full bg-white">
@@ -45,7 +51,7 @@ export default function ColorAnalyzerPage() {
         </motion.div>
 
         {/* TAB SWITCHER */}
-        <div className="mx-auto mb-0 flex max-w-6xl justify-center border-b border-[#e8e8e8]">
+        <div className="relative mx-auto mb-0 flex max-w-6xl justify-center border-b border-[#e8e8e8]">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -61,6 +67,23 @@ export default function ColorAnalyzerPage() {
               {tab.label}
             </button>
           ))}
+
+          {/* SMALL, LOW-KEY FEATURE BUTTON (opens Pattern) */}
+          <button
+            type="button"
+            onClick={() => setActive(featureActive ? "color" : "pattern")}
+            aria-label="Open pattern recognition feature"
+            title="Pattern recognition"
+            className={`absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-1 px-1 text-[9px] tracking-[0.15em] transition-colors ${
+              featureActive
+                ? "text-[#111]"
+                : "text-[#c4c4c4] hover:text-[#777]"
+            }`}
+            style={SANS}
+          >
+            <Sparkles className="h-2.5 w-2.5" />
+            {FEATURE_LABEL}
+          </button>
         </div>
 
         <motion.div
