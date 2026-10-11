@@ -38,6 +38,8 @@ class ProductResult(BaseModel):
     price: Optional[float] = None
     selected_size: str
     match_score: float
+    reranker_score: Optional[float] = None
+    visual_score: Optional[float] = None
     explanation: str
     category: str
     pattern: str

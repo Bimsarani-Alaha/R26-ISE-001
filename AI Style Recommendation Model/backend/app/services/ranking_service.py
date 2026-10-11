@@ -4,6 +4,9 @@ from ..schemas.models import RequirementResponse, ProductResult
 from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION, TOP_K
 from ..services.recommendation_service import recommendation_service
 from ..services.product_service import product_service
+from ..services.cartographer_service import cartographer_service
+from ..services.fashionclip_service import fashionclip_service
+from ..config import RANKER_CANDIDATES_PER_GROUP
 
 
 class RankingService:
@@ -15,14 +18,16 @@ class RankingService:
         candidates: pd.DataFrame,
         requirements: RequirementResponse,
         selected_size: str,
+        query: str = "",
     ) -> list[ProductResult]:
-        return self.calculate_groups(candidates, requirements, selected_size)[0]
+        return self.calculate_groups(candidates, requirements, selected_size, query)[0]
 
     def calculate_groups(
         self,
         candidates: pd.DataFrame,
         requirements: RequirementResponse,
         selected_size: str,
+        query: str = "",
     ) -> tuple[list[ProductResult], list[ProductResult]]:
         has_occasion = bool(requirements.occasion)
         weights = WEIGHTS_WITH_OCCASION if has_occasion else WEIGHTS_WITHOUT_OCCASION
@@ -139,6 +144,28 @@ class RankingService:
         scored.sort(key=lambda x: x.match_score, reverse=True)
         exact = [p for p in scored if p.match_category == "exact"]
         alternatives = [p for p in scored if p.match_category == "alternative" and p.match_score > 0]
+        if query.strip():
+            shortlist = exact[:RANKER_CANDIDATES_PER_GROUP] + alternatives[:RANKER_CANDIDATES_PER_GROUP]
+            visual = fashionclip_service.score(query, shortlist)
+            if visual is not None:
+                for product, score in zip(shortlist, visual):
+                    product.visual_score = score
+                # Keep catalogue evidence authoritative. Missing images sort after
+                # scored images within their group, retaining metadata order.
+                def visual_key(product):
+                    return (product.visual_score is not None,
+                            product.visual_score if product.visual_score is not None else 0.0)
+                exact = sorted(exact[:RANKER_CANDIDATES_PER_GROUP], key=visual_key, reverse=True)
+                alternatives = sorted(alternatives[:RANKER_CANDIDATES_PER_GROUP], key=visual_key, reverse=True)
+                return exact[:TOP_K], alternatives[:TOP_K]
+            relevance = cartographer_service.score(query, shortlist)
+            if relevance is not None:
+                for product, score in zip(shortlist, relevance):
+                    product.reranker_score = score
+                exact = sorted(exact[:RANKER_CANDIDATES_PER_GROUP],
+                               key=lambda p: p.reranker_score, reverse=True)
+                alternatives = sorted(alternatives[:RANKER_CANDIDATES_PER_GROUP],
+                                      key=lambda p: p.reranker_score, reverse=True)
         return exact[:TOP_K], alternatives[:TOP_K]
 
     @staticmethod

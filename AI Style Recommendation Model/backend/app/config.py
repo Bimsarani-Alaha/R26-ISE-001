@@ -72,3 +72,14 @@ WEIGHTS_WITHOUT_OCCASION = {
 
 TOP_K = 5
 MIN_SCORE_THRESHOLD = 0.35
+
+RANKER_ENABLED = os.getenv("RANKER_ENABLED", "true").lower() in {"1", "true", "yes"}
+RANKER_MODEL_PATH = Path(os.getenv("RANKER_MODEL_PATH", str(Path(__file__).resolve().parent / "RankerModel")))
+RANKER_BATCH_SIZE = max(1, int(os.getenv("RANKER_BATCH_SIZE", "16")))
+RANKER_CANDIDATES_PER_GROUP = max(TOP_K, int(os.getenv("RANKER_CANDIDATES_PER_GROUP", "50")))
+
+FASHIONCLIP_ENABLED = os.getenv("FASHIONCLIP_ENABLED", "true").lower() in {"1", "true", "yes"}
+FASHIONCLIP_MODEL_PATH = Path(os.getenv("FASHIONCLIP_MODEL_PATH", str(Path(__file__).resolve().parent / "fashionclip")))
+FASHIONCLIP_CACHE_DIR = Path(os.getenv("FASHIONCLIP_CACHE_DIR", str(BASE_DIR / ".cache" / "fashionclip")))
+FASHIONCLIP_BATCH_SIZE = max(1, int(os.getenv("FASHIONCLIP_BATCH_SIZE", "8")))
+FASHIONCLIP_THREADS = max(1, int(os.getenv("FASHIONCLIP_THREADS", "2")))

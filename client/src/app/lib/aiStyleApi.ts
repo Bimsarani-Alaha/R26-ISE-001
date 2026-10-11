@@ -22,6 +22,8 @@ export interface ProductResult {
   price: number | null;
   selected_size: string;
   match_score: number;
+  reranker_score?: number | null;
+  visual_score?: number | null;
   explanation: string;
   category: string;
   pattern: string;

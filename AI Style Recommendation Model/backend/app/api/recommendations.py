@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 from ..schemas.models import (
     RecommendationRequest,
     RecommendationResponse,
@@ -55,6 +56,8 @@ def _export_results_to_json(
                     "price": r.price,
                     "selected_size": r.selected_size,
                     "match_score": r.match_score,
+                    "reranker_score": r.reranker_score,
+                    "visual_score": r.visual_score,
                     "explanation": r.explanation,
                     "category": r.category,
                     "pattern": r.pattern,
@@ -156,7 +159,10 @@ async def get_recommendations(request: RecommendationRequest):
             logger.info(f"AI extracted article_types: {req_model.article_types}")
             logger.info(f"AI extracted preferred_colors: {req_model.preferred_colors}")
             logger.info(f"AI extracted occasion: {req_model.occasion}")
-            ranked, alternatives = ranking_service.calculate_groups(candidates, req_model, request.size)
+            ranked, alternatives = await run_in_threadpool(
+                ranking_service.calculate_groups, candidates, req_model, request.size,
+                query=request.requirements,
+            )
 
         logger.info("Exact recommendations: %d; similar alternatives: %d", len(ranked), len(alternatives))
         for i, product in enumerate(ranked, 1):
