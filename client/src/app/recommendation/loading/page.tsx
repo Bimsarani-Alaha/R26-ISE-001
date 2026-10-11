@@ -110,7 +110,10 @@ export default function RecommendationLoadingPage() {
 
         if (cancelledRef.current) return;
 
-        setProductResults(result.recommendations);
+        setProductResults([
+          ...result.recommendations,
+          ...(result.alternatives ?? []),
+        ]);
         setStepIndex(PROCESSING_STEPS.length - 1);
         setProgress(100);
 

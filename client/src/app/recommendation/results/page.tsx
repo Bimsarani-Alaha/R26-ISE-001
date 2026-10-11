@@ -17,8 +17,19 @@ const API_BASE_URL =
 
 export default function RecommendationResultsPage() {
   const router = useRouter();
-  const { productResults, requirements, gender, size, hydrated } = useAppStore();
+  const { productResults, requirements, gender, size, hydrated } =
+    useAppStore();
   const [liked, setLiked] = useState<string[]>([]);
+  const matchingProducts = productResults.filter(
+    (item) => item.match_category === "exact",
+  );
+  const alternatives = productResults.filter(
+    (item) => item.match_category !== "exact",
+  );
+  const groups = [
+    { title: "Matching your request", items: matchingProducts },
+    { title: "Similar alternatives", items: alternatives },
+  ];
 
   const toggleLike = (id: string) => {
     setLiked((prev) =>
@@ -36,7 +47,9 @@ export default function RecommendationResultsPage() {
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-[#888] text-sm" style={SANS}>Loading your curated looks…</p>
+        <p className="text-[#888] text-sm" style={SANS}>
+          Loading your curated looks…
+        </p>
       </div>
     );
   }
@@ -46,7 +59,7 @@ export default function RecommendationResultsPage() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-[#888] mb-4" style={SANS}>
-            No recommendations found
+            No products match all your requirements.
           </p>
           <button
             type="button"
@@ -115,160 +128,185 @@ export default function RecommendationResultsPage() {
             &quot;{requirements}&quot;
           </p>
 
-          <p
-            className="text-[10px] tracking-[0.2em] text-[#bbb]"
-            style={SANS}
-          >
+          <p className="text-[10px] tracking-[0.2em] text-[#bbb]" style={SANS}>
             {gender.toUpperCase()} · SIZE {size.toUpperCase()} ·{" "}
             {productResults.length} RESULTS
           </p>
         </motion.div>
 
-        {/* GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {productResults.map((item, i) => (
-            <motion.div
-              key={item.product_id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: 0.1 + i * 0.08,
-              }}
-            >
-              <Card
-                className="group cursor-pointer border-0 rounded-none bg-transparent gap-0"
-                onClick={() => router.push(`/recommendation/${item.product_id}`)}
-              >
-                {/* IMAGE */}
-                <div className="relative overflow-hidden aspect-[3/4] bg-[#f5f5f5] mb-4">
-                  <img
-                    src={getImageUrl(item.image_path)}
-                    alt={item.article_type}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      if (img.dataset.fallback !== "true") {
-                        img.dataset.fallback = "true";
-                        img.src = `${API_BASE_URL}/fashion-recommendation/images/placeholder.jpg`;
-                      }
-                    }}
-                  />
-
-                  {/* LIKE BUTTON */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLike(item.product_id);
-                    }}
-                    className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-all duration-200 bg-white/80 backdrop-blur-sm ${
-                      liked.includes(item.product_id)
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
-                    }`}
-                  >
-                    <span
-                      className={`w-4 h-4 transition-colors ${
-                        liked.includes(item.product_id)
-                          ? "fill-[#111] text-[#111]"
-                          : "text-[#555]"
-                      }`}
-                    >
-                      ♥
-                    </span>
-                  </button>
-
-                 
-
-                  {/* CATEGORY */}
-                  <div className="absolute bottom-3 left-3">
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] tracking-[0.2em] text-white bg-black/50 backdrop-blur-sm px-2 py-1 rounded-none border-0"
-                      style={SANS}
-                    >
-                      {item.article_type.toUpperCase()}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* INFO */}
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <h3
-                      className="text-sm tracking-wide text-[#111] leading-snug"
-                      style={{
-                        ...SERIF,
-                        fontWeight: 500,
+        {matchingProducts.length === 0 && (
+          <p role="status" className="text-sm text-[#555] mb-8" style={SANS}>
+            No products match all your requirements. Any available alternatives
+            are shown below.
+          </p>
+        )}
+        {groups.map(
+          ({ title, items }) =>
+            items.length > 0 && (
+              <section key={title} aria-label={title} className="mb-12">
+                <h2 className="text-2xl text-[#111] mb-4" style={SERIF}>
+                  {title}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {items.map((item, i) => (
+                    <motion.div
+                      key={item.product_id}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        delay: 0.1 + i * 0.08,
                       }}
                     >
-                      {item.article_type} · {item.base_colour}
-                    </h3>
-
-                    <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5">
-                      <Star className="w-3 h-3 fill-[#111] text-[#111]" />
-                      <span className="text-xs text-[#555]" style={SANS}>
-                        {item.match_score.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p
-                    className="text-xs text-[#999] mb-2 line-clamp-2 leading-relaxed"
-                    style={{
-                      ...SANS,
-                      fontWeight: 300,
-                    }}
-                  >
-                    {item.style} · {item.base_colour}
-                  </p>
-
-                  {/* TAGS */}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
-                      style={SANS}
-                    >
-                      {item.base_colour.toUpperCase()}
-                    </Badge>
-
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
-                      style={SANS}
-                    >
-                      {item.style.toUpperCase()}
-                    </Badge>
-
-                    {item.price && (
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
-                        style={SANS}
+                      <Card
+                        className="group cursor-pointer border-0 rounded-none bg-transparent gap-0"
+                        onClick={() =>
+                          router.push(`/recommendation/${item.product_id}`)
+                        }
                       >
-                        Rs. {item.price.toLocaleString("en-LK")}
-                      </Badge>
-                    )}
-                  </div>
+                        {/* IMAGE */}
+                        <div className="relative overflow-hidden aspect-[3/4] bg-[#f5f5f5] mb-4">
+                          <img
+                            src={getImageUrl(item.image_path)}
+                            alt={item.article_type}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            onError={(e) => {
+                              const img = e.currentTarget as HTMLImageElement;
+                              if (img.dataset.fallback !== "true") {
+                                img.dataset.fallback = "true";
+                                img.src = `${API_BASE_URL}/fashion-recommendation/images/placeholder.jpg`;
+                              }
+                            }}
+                          />
 
-                  {/* VIEW */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/recommendation/${item.product_id}`);
-                    }}
-                    className="mt-3 text-[10px] tracking-[0.15em] text-[#888] hover:text-[#111] transition-colors underline underline-offset-2"
-                    style={SANS}
-                  >
-                    VIEW MORE
-                  </button>
+                          {/* LIKE BUTTON */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleLike(item.product_id);
+                            }}
+                            className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-all duration-200 bg-white/80 backdrop-blur-sm ${
+                              liked.includes(item.product_id)
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 transition-colors ${
+                                liked.includes(item.product_id)
+                                  ? "fill-[#111] text-[#111]"
+                                  : "text-[#555]"
+                              }`}
+                            >
+                              ♥
+                            </span>
+                          </button>
+
+                          {/* CATEGORY */}
+                          <div className="absolute bottom-3 left-3">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] tracking-[0.2em] text-white bg-black/50 backdrop-blur-sm px-2 py-1 rounded-none border-0"
+                              style={SANS}
+                            >
+                              {item.article_type.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* INFO */}
+                        <div>
+                          {item.match_category !== "exact" && (
+                            <p
+                              className="text-xs text-[#666] mb-2"
+                              style={SANS}
+                            >
+                              {item.unmatched_requirements?.length
+                                ? `Different ${item.unmatched_requirements.join(", ")}`
+                                : "Match not verified — run a new search to check your requirements"}
+                            </p>
+                          )}
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <h3
+                              className="text-sm tracking-wide text-[#111] leading-snug"
+                              style={{
+                                ...SERIF,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {item.article_type} · {item.base_colour}
+                            </h3>
+
+                            <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5">
+                              <Star className="w-3 h-3 fill-[#111] text-[#111]" />
+                              <span
+                                className="text-xs text-[#555]"
+                                style={SANS}
+                              >
+                                {item.match_score.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p
+                            className="text-xs text-[#999] mb-2 line-clamp-2 leading-relaxed"
+                            style={{
+                              ...SANS,
+                              fontWeight: 300,
+                            }}
+                          >
+                            {item.style} · {item.base_colour}
+                          </p>
+
+                          {/* TAGS */}
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
+                              style={SANS}
+                            >
+                              {item.base_colour.toUpperCase()}
+                            </Badge>
+
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
+                              style={SANS}
+                            >
+                              {item.style.toUpperCase()}
+                            </Badge>
+
+                            {item.price && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] tracking-[0.15em] text-[#999] border border-[#e5e5e5] px-2 py-0.5 rounded-none"
+                                style={SANS}
+                              >
+                                Rs. {item.price.toLocaleString("en-LK")}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* VIEW */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/recommendation/${item.product_id}`);
+                            }}
+                            className="mt-3 text-[10px] tracking-[0.15em] text-[#888] hover:text-[#111] transition-colors underline underline-offset-2"
+                            style={SANS}
+                          >
+                            VIEW MORE
+                          </button>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
                 </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+              </section>
+            ),
+        )}
 
         {/* BUTTON */}
         <motion.div

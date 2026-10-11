@@ -1,7 +1,7 @@
 import pandas as pd
-from typing import Optional
+import re
 from ..schemas.models import RequirementResponse, ProductResult
-from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION, TOP_K, MIN_SCORE_THRESHOLD
+from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION, TOP_K
 from ..services.recommendation_service import recommendation_service
 from ..services.product_service import product_service
 
@@ -16,9 +16,16 @@ class RankingService:
         requirements: RequirementResponse,
         selected_size: str,
     ) -> list[ProductResult]:
+        return self.calculate_groups(candidates, requirements, selected_size)[0]
+
+    def calculate_groups(
+        self,
+        candidates: pd.DataFrame,
+        requirements: RequirementResponse,
+        selected_size: str,
+    ) -> tuple[list[ProductResult], list[ProductResult]]:
         has_occasion = bool(requirements.occasion)
         weights = WEIGHTS_WITH_OCCASION if has_occasion else WEIGHTS_WITHOUT_OCCASION
-        has_article_filter = bool(requirements.article_types)
 
         scored = []
         for _, row in candidates.iterrows():
@@ -30,9 +37,6 @@ class RankingService:
                 requirements.article_types,
                 "article_type",
             )
-
-            if has_article_filter and at_score == 0.0:
-                continue
 
             score_breakdown["article_type"] = at_score
             total_score += at_score * weights.get("article_type", 0)
@@ -102,6 +106,7 @@ class RankingService:
             )
 
             product_result = ProductResult(
+                unmatched_requirements=self._unmatched_requirements(row, requirements),
                 product_id=str(row["product_id"]),
                 image_path=str(row.get("image_path", "")),
                 article_type=str(row.get("article_type", "")),
@@ -119,11 +124,49 @@ class RankingService:
                 neck_type=str(row.get("neck_type", "")),
                 description=str(row.get("description", "")),
             )
+            if product_result.unmatched_requirements:
+                product_result.match_category = "alternative"
+                product_result.explanation = (
+                    f"Similar alternative in your selected size. Differs in: "
+                    f"{', '.join(product_result.unmatched_requirements)}."
+                )
             scored.append(product_result)
 
         scored.sort(key=lambda x: x.match_score, reverse=True)
-        filtered = [p for p in scored if p.match_score >= MIN_SCORE_THRESHOLD]
-        return filtered[:TOP_K]
+        exact = [p for p in scored if p.match_category == "exact"]
+        alternatives = [p for p in scored if p.match_category == "alternative" and p.match_score > 0]
+        return exact[:TOP_K], alternatives[:TOP_K]
+
+    @staticmethod
+    def _normalize(value: str, field: str) -> str:
+        value = str(value).strip().casefold()
+        if field == "occasion":
+            value = product_service.normalize_occasion(value).casefold()
+        aliases = {
+            "colour": {"gray": "grey"},
+            "clothing type": {
+                "pants": "trousers", "trouser": "trousers",
+                "tee": "t-shirt", "teeshirt": "t-shirt", "tshirt": "t-shirt",
+                "sari": "saree", "frock": "dress", "frock dress": "dress",
+            },
+        }
+        return aliases.get(field, {}).get(value, value)
+
+    def _unmatched_requirements(self, row: pd.Series, requirements: RequirementResponse) -> list[str]:
+        unmatched = []
+        for field, column, requested in (
+            ("colour", "base_colour", requirements.preferred_colors),
+            ("clothing type", "article_type", requirements.article_types),
+            ("occasion", "occasion", requirements.occasion),
+        ):
+            if not requested:
+                continue
+            value = row.get(column)
+            actual = [] if pd.isna(value) else re.split(r"[,/;]", str(value))
+            normalized = {self._normalize(v, field) for v in actual}
+            if not any(self._normalize(v, field) in normalized for v in requested):
+                unmatched.append(field)
+        return unmatched
 
     def _score_occasion(
         self, product_occasion: str, requested_occasions: list[str]

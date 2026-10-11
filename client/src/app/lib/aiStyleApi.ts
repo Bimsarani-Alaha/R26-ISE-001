@@ -10,6 +10,8 @@ export interface HealthResponse {
 }
 
 export interface ProductResult {
+  match_category?: "exact" | "alternative";
+  unmatched_requirements?: string[];
   product_id: string;
   image_path: string;
   article_type: string;
@@ -36,6 +38,7 @@ export interface GetRecommendationsRequest {
 
 export interface GetRecommendationsResponse {
   recommendations: ProductResult[];
+  alternatives: ProductResult[];
   occasion_used: string[] | null;
   total_candidates: number;
   message: string | null;
