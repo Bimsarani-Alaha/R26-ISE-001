@@ -40,6 +40,14 @@ class FashionClipService:
         self._failed = False
         self._lock = Lock()
 
+    def status(self) -> str:
+        # "unknown" until the first request, since encoders load lazily.
+        if not self.enabled:
+            return "disabled"
+        if self._failed:
+            return "unavailable"
+        return "loaded" if self._worker is not None else "pending"
+
     def resolve_image(self, value: str) -> Path | None:
         value = str(value).replace("\\", "/").strip()
         if value.lower().startswith("images/"):

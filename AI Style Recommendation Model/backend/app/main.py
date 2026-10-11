@@ -8,6 +8,8 @@ from .api.recommendations import router as recommendations_router
 from .api.stylist import router as stylist_router
 from .services.product_service import product_service
 from .services.qwen_service import qwen_service
+from .services.fashionclip_service import fashionclip_service
+from .services.cartographer_service import cartographer_service
 from .config import IMAGES_DIR, QWEN_MODEL
 
 app = FastAPI(
@@ -110,11 +112,19 @@ async def root():
 async def _health_payload():
     product_service._ensure_loaded()
     model_available = await qwen_service.check_connection()
+    rankers = {
+        "fashionclip": fashionclip_service.status(),
+        "cartographer": cartographer_service.status(),
+    }
+    # A ranker that latched off silently degrades results without breaking them,
+    # so report it instead of returning a clean "healthy".
+    ranker_unavailable = any(state == "unavailable" for state in rankers.values())
     return {
-        "status": "healthy" if model_available else "degraded",
+        "status": "healthy" if model_available and not ranker_unavailable else "degraded",
         "model_available": model_available,
         "ollama_connected": model_available,
         "model_name": QWEN_MODEL,
+        "rankers": rankers,
         "products_loaded": product_service.df is not None,
         "product_count": len(product_service.df) if product_service.df is not None else 0,
     }

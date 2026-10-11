@@ -56,6 +56,14 @@ class CartographerService:
                 scores.extend(self._model(**inputs).logits.reshape(-1).tolist())
         return scores
 
+    def status(self) -> str:
+        # "unknown" until the first request, since the model loads lazily.
+        if not self.enabled:
+            return "disabled"
+        if self._failed:
+            return "unavailable"
+        return "loaded" if self._model is not None else "pending"
+
     def score(self, query: str, products: list[ProductResult]) -> list[float] | None:
         if not self.enabled or not query.strip() or not products:
             return None

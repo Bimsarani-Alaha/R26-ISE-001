@@ -65,6 +65,30 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
+### Install dependencies into the interpreter that actually serves requests
+
+Passing tests is not evidence the serving environment has the dependencies. The
+main app runs from `server/venv`, which is a different interpreter from a bare
+`python` on PATH. Installing into the PATH interpreter leaves the server falling
+back to rule-based ranking with only a log warning, and requests still succeed.
+
+Install into `server/venv` explicitly:
+
+```powershell
+& "..\..\server\venv\Scripts\python.exe" -m pip install transformers ftfy onnxruntime
+```
+
+Verify both models load in that interpreter before trusting a ranking result:
+
+```powershell
+& "..\..\server\venv\Scripts\python.exe" -m pytest -q   # requires pytest in that venv
+```
+
+Both models raise `ModuleNotFoundError` in a worker thread, which is caught and
+downgraded to a warning, so a missing package never surfaces as an error response.
+`FashionSigLIP unavailable` and `Cartographer unavailable` in the log mean the
+feature is disabled for that process.
+
 The local `app/RankerModel` directory must contain the original `config.json`,
 `model.safetensors`, `tokenizer_config.json`, `tokenizer.json`, `vocab.txt`, and
 `special_tokens_map.json` from:
