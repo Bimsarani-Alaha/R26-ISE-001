@@ -105,8 +105,10 @@ class RankingService:
                 row, requirements, score_breakdown, has_occasion
             )
 
+            mismatches, unverified = self._requirement_evidence(row, requirements)
             product_result = ProductResult(
-                unmatched_requirements=self._unmatched_requirements(row, requirements),
+                unmatched_requirements=mismatches,
+                unverified_requirements=unverified,
                 product_id=str(row["product_id"]),
                 image_path=str(row.get("image_path", "")),
                 article_type=str(row.get("article_type", "")),
@@ -124,12 +126,14 @@ class RankingService:
                 neck_type=str(row.get("neck_type", "")),
                 description=str(row.get("description", "")),
             )
-            if product_result.unmatched_requirements:
+            if mismatches or unverified:
                 product_result.match_category = "alternative"
-                product_result.explanation = (
-                    f"Similar alternative in your selected size. Differs in: "
-                    f"{', '.join(product_result.unmatched_requirements)}."
-                )
+                parts = ["Similar alternative in your selected size."]
+                if mismatches:
+                    parts.append(f"Differs in: {', '.join(mismatches)}.")
+                if unverified:
+                    parts.append(f"Not verified: {', '.join(unverified)}.")
+                product_result.explanation = " ".join(parts)
             scored.append(product_result)
 
         scored.sort(key=lambda x: x.match_score, reverse=True)
@@ -153,20 +157,46 @@ class RankingService:
         return aliases.get(field, {}).get(value, value)
 
     def _unmatched_requirements(self, row: pd.Series, requirements: RequirementResponse) -> list[str]:
+        return self._requirement_evidence(row, requirements)[0]
+
+    def _requirement_evidence(
+        self, row: pd.Series, requirements: RequirementResponse
+    ) -> tuple[list[str], list[str]]:
+        """Separate known differences from requirements lacking catalogue evidence."""
         unmatched = []
+        unverified = []
         for field, column, requested in (
             ("colour", "base_colour", requirements.preferred_colors),
             ("clothing type", "article_type", requirements.article_types),
             ("occasion", "occasion", requirements.occasion),
+            ("style", "style", requirements.style_preferences),
+            ("material", "material", requirements.materials),
+            ("pattern", "pattern", requirements.patterns),
+            ("sleeve type", "sleeve_type", requirements.sleeve_types),
+            ("neckline", "neck_type", requirements.neck_types),
         ):
             if not requested:
                 continue
             value = row.get(column)
-            actual = [] if pd.isna(value) else re.split(r"[,/;]", str(value))
+            # Only occasion is a multi-value source field. Keep compound
+            # material/garment labels intact rather than treating them as options.
+            actual = [] if pd.isna(value) else (
+                re.split(r"[,/;]", str(value)) if field == "occasion" else [str(value)]
+            )
             normalized = {self._normalize(v, field) for v in actual}
+            normalized -= {"", "unknown", "n/a", "na", "none", "null", "nan"}
+            if not normalized:
+                unverified.append(field)
+                continue
             if not any(self._normalize(v, field) in normalized for v in requested):
                 unmatched.append(field)
-        return unmatched
+        # Free-text needs have no dedicated supporting attributes in this schema.
+        # A generated description or a material guess cannot verify them.
+        for requirement in requirements.other_requirements:
+            requirement = requirement.strip()
+            if requirement and requirement not in unverified:
+                unverified.append(requirement)
+        return unmatched, unverified
 
     def _score_occasion(
         self, product_occasion: str, requested_occasions: list[str]

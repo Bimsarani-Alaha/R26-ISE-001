@@ -46,6 +46,7 @@ def _export_results_to_json(
                 {
                     "match_category": r.match_category,
                     "unmatched_requirements": r.unmatched_requirements,
+                    "unverified_requirements": r.unverified_requirements,
                     "product_id": r.product_id,
                     "article_type": r.article_type,
                     "base_colour": r.base_colour,
