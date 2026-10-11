@@ -12,6 +12,7 @@ export interface HealthResponse {
 export interface ProductResult {
   match_category?: "exact" | "alternative";
   unmatched_requirements?: string[];
+  unverified_requirements?: string[];
   product_id: string;
   image_path: string;
   article_type: string;

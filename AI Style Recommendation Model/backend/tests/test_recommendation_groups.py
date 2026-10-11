@@ -59,7 +59,8 @@ def test_missing_attributes_do_not_count_as_exact_matches():
     exact, alternatives = groups([product("missing", colour=float("nan"))],
                                 preferred_colors=["Red"], article_types=["Shirt"])
     assert exact == []
-    assert alternatives[0].unmatched_requirements == ["colour"]
+    assert alternatives[0].unmatched_requirements == []
+    assert alternatives[0].unverified_requirements == ["colour"]
 
 
 def test_unspecified_fields_do_not_restrict_results_and_aliases_are_normalized():

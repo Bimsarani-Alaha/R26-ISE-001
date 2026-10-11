@@ -28,6 +28,7 @@ class RecommendationRequest(BaseModel):
 class ProductResult(BaseModel):
     match_category: Literal["exact", "alternative"] = "exact"
     unmatched_requirements: list[str] = Field(default_factory=list)
+    unverified_requirements: list[str] = Field(default_factory=list)
     product_id: str
     image_path: str
     article_type: str

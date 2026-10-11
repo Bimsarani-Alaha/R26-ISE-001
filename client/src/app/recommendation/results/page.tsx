@@ -221,9 +221,15 @@ export default function RecommendationResultsPage() {
                               className="text-xs text-[#666] mb-2"
                               style={SANS}
                             >
-                              {item.unmatched_requirements?.length
-                                ? `Different ${item.unmatched_requirements.join(", ")}`
-                                : "Match not verified — run a new search to check your requirements"}
+                              {[
+                                item.unmatched_requirements?.length
+                                  ? `Different ${item.unmatched_requirements.join(", ")}`
+                                  : null,
+                                item.unverified_requirements?.length
+                                  ? `Not verified: ${item.unverified_requirements.join(", ")}`
+                                  : null,
+                              ].filter(Boolean).join(". ") ||
+                                "Match not verified — run a new search to check your requirements"}
                             </p>
                           )}
                           <div className="flex items-start justify-between gap-2 mb-1.5">
