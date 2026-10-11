@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import re
 from pathlib import Path
 from typing import Optional
 from ..config import (
@@ -28,6 +29,7 @@ class ProductService:
 
         df = pd.read_csv(DATASET_PATH)
         self._validate_columns(df)
+        self._normalize_article_types(df)
         self._normalize_sizes(df)
         self._validate_prices(df)
         self._validate_image_paths(df)
@@ -41,6 +43,24 @@ class ProductService:
             raise ValueError(f"Missing columns: {missing}")
         if extra:
             print(f"Warning: extra columns found: {extra}")
+
+    def _normalize_article_types(self, df: pd.DataFrame):
+        def normalize(row):
+            article = str(row["article_type"]).strip()
+            description = str(row.get("description", "")).casefold()
+            # Some catalog shirts have only the broad "Top" label. Refine it
+            # from explicit garment metadata without treating every top as a shirt.
+            if article.casefold() != "top":
+                return article
+            if re.search(r"\b(?:t[ -]?shirt|sweatshirt|polo shirt|shirt jacket|shirt dress)\b", description):
+                return article
+            if re.search(r"\bshirt\b", description) and re.search(
+                r"\b(?:button[ -](?:front|down)|dress shirt)\b", description
+            ):
+                return "Shirt"
+            return article
+
+        df["article_type"] = df.apply(normalize, axis=1)
 
     def _normalize_sizes(self, df: pd.DataFrame):
         def parse_sizes(val):

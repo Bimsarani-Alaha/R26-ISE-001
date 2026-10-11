@@ -3,7 +3,7 @@ Extract fashion requirements as JSON from the customer request below.
 Schema: {"occasion": null, "preferred_colors": [], "article_types": [], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
 
 VALID ARTICLE TYPES (use ONLY these exact values):
-Saree, Dress, Kurta, Kurti, Lehenga, Lehenga Choli Set, Top, Blouse, Jeans, Pants, Trousers, Skirt, Jumpsuit, Suit Set, Salwar Kameez, Sharara Set, Anarkali Suit, Co-ord Set, Cardigan, Jacket, Shorts, Romper, Palazzo, Crop Top, Maxi Dress, Midi Dress, Mini Dress
+Saree, Dress, Kurta, Kurti, Lehenga, Lehenga Choli Set, Shirt, T-Shirt, Sweatshirt, Top, Blouse, Jeans, Pants, Trousers, Skirt, Jumpsuit, Suit Set, Salwar Kameez, Sharara Set, Anarkali Suit, Co-ord Set, Cardigan, Jacket, Shorts, Romper, Palazzo, Crop Top, Maxi Dress, Midi Dress, Mini Dress
 
 VALID COLORS:
 Red, Blue, Green, Yellow, Pink, Purple, Orange, Black, White, Grey, Brown, Navy Blue, Light Blue, Teal Blue, Maroon, Beige, Cream, Gold, Silver, Rose Gold, Peach, Lavender, Magenta, Coral, Olive, Teal, Turquoise, Navy, Burgundy, Charcoal, Ivory
@@ -33,12 +33,15 @@ RULES:
 4. Only extract explicitly stated requirements. Do NOT infer or guess.
 5. price_preference: {"max": N} or {"min": N} or null
 6. Return ONLY valid JSON, no other text.
+7. Preserve the requested clothing type: "shirt" = "Shirt", "t-shirt" = "T-Shirt", "sweatshirt" = "Sweatshirt". Do not replace a shirt with a top or blouse.
+8. "office wear", "office", and "workwear" use occasion ["Office"]. Preserve explicit colours and clothing types even when no exact product may exist.
 
 EXAMPLE:
+Customer request: "i need a red color shirt for office wear"
+Response: {"occasion": ["Office"], "preferred_colors": ["Red"], "article_types": ["Shirt"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
 Customer request: "i need a blue saree for wedding"
 Response: {"occasion": ["Wedding"], "preferred_colors": ["Blue"], "article_types": ["Saree"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
 
 Customer request: "red cotton kurta for office"
-Response: {"occasion": ["Formal"], "preferred_colors": ["Red"], "article_types": ["Kurta"], "style_preferences": [], "materials": ["Cotton"], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
-
-Customer request: "i need a blue saree for wedding"
+Response: {"occasion": ["Office"], "preferred_colors": ["Red"], "article_types": ["Kurta"], "style_preferences": [], "materials": ["Cotton"], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
