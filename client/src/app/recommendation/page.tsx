@@ -3,7 +3,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
@@ -23,6 +23,14 @@ const EXAMPLE_PROMPTS = [
 ];
 
 export default function RecommendationPage() {
+  return (
+    <Suspense fallback={<div role="status">Loading recommendations…</div>}>
+      <RecommendationForm />
+    </Suspense>
+  );
+}
+
+function RecommendationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromSize = searchParams.get("from") === "size";
