@@ -105,3 +105,13 @@ test("non-JSON errors include the HTTP status", async () => {
   globalThis.fetch = async () => new Response("Bad gateway", { status: 502 });
   await assert.rejects(checkHealth(), /502/);
 });
+
+test("network failures identify the unreachable backend and preserve the cause", async () => {
+  const { checkHealth } = await import("../src/app/lib/aiStyleApi.ts");
+  globalThis.fetch = async () => { throw new TypeError("Failed to fetch"); };
+  await assert.rejects(checkHealth(), (error) => {
+    assert.match(error.message, /http:\/\/localhost:8000/);
+    assert.match(error.message, /Failed to fetch/);
+    return true;
+  });
+});

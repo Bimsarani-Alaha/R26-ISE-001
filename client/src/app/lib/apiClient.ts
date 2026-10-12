@@ -14,6 +14,9 @@ export async function requestJson<T>(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }),
+  }).catch((error: unknown) => {
+    const reason = error instanceof Error ? error.message : "Network request failed";
+    throw new Error(`Cannot connect to ${API_BASE_URL}. ${reason}`);
   });
 
   if (!response.ok) {

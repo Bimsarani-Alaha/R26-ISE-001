@@ -4,7 +4,7 @@ import base64
 import logging
 from pathlib import Path
 from typing import Optional
-from ..config import OLLAMA_BASE_URL, QWEN_MODEL, PROMPTS_DIR, IMAGES_DIR
+from ..config import OLLAMA_BASE_URL, QWEN_MODEL, QWEN_STYLIST_MODEL, QWEN_STYLIST_TIMEOUT, PROMPTS_DIR, IMAGES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,19 @@ class QwenService:
             return path.read_text(encoding="utf-8")
         raise FileNotFoundError(f"Prompt file not found: {path}")
 
-    async def _call_ollama(self, prompt: str, images: list[str] = None) -> str:
+    async def _call_ollama(self, prompt: str, images: list[str] = None, model: Optional[str] = None) -> str:
+        model = model or QWEN_MODEL
         payload = {
-            "model": QWEN_MODEL,
+            "model": model,
             "prompt": prompt,
             "stream": False,
         }
+        if model == QWEN_STYLIST_MODEL:
+            # Qwen3's installed thinking variant can return an empty response
+            # with format=json. The stylist prompt already requires JSON.
+            payload["think"] = False
+        else:
+            payload["format"] = "json"
         if images:
             encoded_images = []
             for img_path in images:
@@ -37,16 +44,26 @@ class QwenService:
                 payload["images"] = encoded_images
 
         headers = {"ngrok-skip-browser-warning": "true"}
-        # qwen3-vl:8b via ngrok + Colab is slow (cold start >60s, VL+ngrok overhead)
-        # Use 180s for all to avoid "Model request timed out" on POST /recommendations
-        timeout = 180.0
+        # Image encoding and reasoning take longer than text extraction locally.
+        timeout = QWEN_STYLIST_TIMEOUT if model == QWEN_STYLIST_MODEL else 180.0
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                logger.info(f"Calling Ollama at {OLLAMA_BASE_URL}/api/generate (timeout={timeout}s)")
+                logger.info(f"Calling Ollama model {model} at {OLLAMA_BASE_URL}/api/generate (timeout={timeout}s)")
                 response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, headers=headers)
                 response.raise_for_status()
                 result = response.json()
                 return result.get("response", "")
+        except httpx.HTTPStatusError as e:
+            detail = e.response.text[:2000]
+            try:
+                body = e.response.json()
+                if isinstance(body, dict) and body.get("error"):
+                    detail = str(body["error"])[:2000]
+            except ValueError:
+                pass
+            message = f"Model request failed (HTTP {e.response.status_code}): {detail}"
+            logger.error("Ollama model %s: %s", model, message)
+            return json.dumps({"error": message})
         except httpx.TimeoutException:
             logger.error("Ollama request timed out")
             return json.dumps({"error": "Model request timed out. Please try again."})
@@ -83,16 +100,16 @@ class QwenService:
 
         full_prompt = f"{self.stylist_prompt}\n\n{context}"
 
-        # Resolve product image so qwen3-vl:8b scans image + metadata together.
+        # Resolve product image so the vision model scans image + metadata together.
         raw_image_ref = image_path or product_metadata.get("image_path")
         resolved = self._resolve_image(raw_image_ref) if raw_image_ref else None
         images = [resolved] if resolved else None
         if resolved:
-            logger.info(f"Stylist vision: sending image {resolved} to {QWEN_MODEL}")
+            logger.info(f"Stylist vision: sending image {resolved} to {QWEN_STYLIST_MODEL}")
         else:
             logger.info("Stylist vision: no product image found, using text-only advice")
 
-        raw_response = await self._call_ollama(full_prompt, images=images)
+        raw_response = await self._call_ollama(full_prompt, images=images, model=QWEN_STYLIST_MODEL)
         return self._parse_json_response(raw_response)
 
     def _resolve_image(self, image_path: str) -> Optional[str]:
@@ -139,7 +156,8 @@ class QwenService:
                     return False
                 data = response.json()
                 models = data.get("models", [])
-                return any(m.get("name") == QWEN_MODEL for m in models)
+                installed = {m.get("name") for m in models}
+                return {QWEN_MODEL, QWEN_STYLIST_MODEL}.issubset(installed)
         except Exception as e:
             logger.warning(f"Ollama connection check failed: {e}")
             return False

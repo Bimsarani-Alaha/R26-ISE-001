@@ -27,7 +27,10 @@ DATASET_PATH = DATA_DIR / "product_full_updated.csv"
 OCCASION_MAPPING_PATH = CONFIG_DIR / "occasion_mapping.json"
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+# Keep text preference extraction separate from product image analysis.
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen2.5:7b")
+QWEN_STYLIST_MODEL = os.getenv("QWEN_STYLIST_MODEL", "qwen3-vl:8b")
+QWEN_STYLIST_TIMEOUT = float(os.getenv("QWEN_STYLIST_TIMEOUT", "600"))
 
 REQUIRED_COLUMNS = [
     "product_id",

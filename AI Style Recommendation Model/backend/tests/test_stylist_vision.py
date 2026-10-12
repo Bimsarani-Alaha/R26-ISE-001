@@ -25,7 +25,7 @@ def test_stylist_sends_image_to_qwen(tmp_path, monkeypatch):
 
         captured = {}
 
-        async def fake_call(prompt: str, images=None):
+        async def fake_call(prompt: str, images=None, model=None):
             captured["prompt"] = prompt
             captured["images"] = images
             return json.dumps({
@@ -81,7 +81,7 @@ def test_stylist_missing_image_still_returns_text_advice(monkeypatch):
     svc.requirement_prompt = "req"
     svc.stylist_prompt = "You are stylist."
 
-    async def fake_call(prompt: str, images=None):
+    async def fake_call(prompt: str, images=None, model=None):
         # Missing image -> images should be None/empty, but prompt must still work
         assert not images, "should not send images when file is missing"
         return json.dumps({

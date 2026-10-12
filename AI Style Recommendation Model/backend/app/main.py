@@ -10,7 +10,7 @@ from .services.product_service import product_service
 from .services.qwen_service import qwen_service
 from .services.fashionclip_service import fashionclip_service
 from .services.cartographer_service import cartographer_service
-from .config import IMAGES_DIR, QWEN_MODEL
+from .config import IMAGES_DIR, QWEN_MODEL, QWEN_STYLIST_MODEL
 
 app = FastAPI(
     title="AI Fashion Recommendation System",
@@ -124,6 +124,7 @@ async def _health_payload():
         "model_available": model_available,
         "ollama_connected": model_available,
         "model_name": QWEN_MODEL,
+        "stylist_model_name": QWEN_STYLIST_MODEL,
         "rankers": rankers,
         "products_loaded": product_service.df is not None,
         "product_count": len(product_service.df) if product_service.df is not None else 0,

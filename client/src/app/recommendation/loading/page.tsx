@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
@@ -39,7 +39,7 @@ export default function RecommendationLoadingPage() {
   const [error, setError] = useState("");
   const [modelStatus, setModelStatus] = useState<HealthResponse | null>(null);
   const [checkingModel, setCheckingModel] = useState(true);
-  const cancelledRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!requirements || !gender || !size) {
@@ -47,7 +47,7 @@ export default function RecommendationLoadingPage() {
       return;
     }
 
-    cancelledRef.current = false;
+    let cancelled = false;
 
     const stepInterval = 650;
     const stepTimer = setInterval(() => {
@@ -73,13 +73,15 @@ export default function RecommendationLoadingPage() {
         setStepIndex(0);
         let health: HealthResponse | null = null;
         let retries = 0;
+        let connectionError = "Unable to reach the server. Please check if the backend is running.";
         const maxRetries = 5;
 
-        while (retries < maxRetries && !cancelledRef.current) {
+        while (retries < maxRetries && !cancelled) {
           try {
             health = await checkHealth();
             break;
-          } catch {
+          } catch (error) {
+            if (error instanceof Error) connectionError = error.message;
             retries++;
             if (retries < maxRetries) {
               await new Promise((r) => setTimeout(r, 2000));
@@ -87,7 +89,7 @@ export default function RecommendationLoadingPage() {
           }
         }
 
-        if (cancelledRef.current) return;
+        if (cancelled) return;
 
         if (!health || !health.ollama_connected) {
           setModelStatus(health);
@@ -95,7 +97,7 @@ export default function RecommendationLoadingPage() {
           setError(
             health
               ? "Ollama is not connected. Please ensure your model is running."
-              : "Unable to reach the server. Please check if the backend is running.",
+              : connectionError,
           );
           setProgress(0);
           return;
@@ -108,7 +110,7 @@ export default function RecommendationLoadingPage() {
         setStepIndex(2);
         const result = await getRecommendations({ gender, size, requirements });
 
-        if (cancelledRef.current) return;
+        if (cancelled) return;
 
         setProductResults([
           ...result.recommendations,
@@ -117,9 +119,11 @@ export default function RecommendationLoadingPage() {
         setStepIndex(PROCESSING_STEPS.length - 1);
         setProgress(100);
 
-        setTimeout(() => router.replace("/recommendation/results"), 500);
+        setTimeout(() => {
+          if (!cancelled) router.replace("/recommendation/results");
+        }, 500);
       } catch (requestError) {
-        if (cancelledRef.current) return;
+        if (cancelled) return;
 
         const message =
           requestError instanceof Error
@@ -133,20 +137,19 @@ export default function RecommendationLoadingPage() {
     void runPipeline();
 
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
       clearInterval(stepTimer);
       clearInterval(progressTimer);
       clearInterval(tipTimer);
     };
-  }, [router, requirements, gender, size, setProductResults]);
+  }, [router, requirements, gender, size, setProductResults, attempt]);
 
   const handleRetry = () => {
     setError("");
     setCheckingModel(true);
     setProgress(0);
     setStepIndex(0);
-    // Re-trigger the effect by refreshing
-    router.refresh();
+    setAttempt((current) => current + 1);
   };
 
   return (
