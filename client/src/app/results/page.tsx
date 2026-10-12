@@ -30,8 +30,7 @@ export default function ResultsPage() {
     const payload = {
       requirements: store.requirements,
       occasion: store.occasion,
-      gender: store.gender,
-      colorPreference: store.colorPreference,
+      gender: store.bodyMeasurements?.gender,
       prediction: store.prediction,
       recommendations: store.recommendations.map((item) => ({
         id: item.id,
@@ -56,7 +55,7 @@ export default function ResultsPage() {
     };
 
     void saveSystemData(payload).catch(() => undefined);
-  }, [store.requirements, store.occasion, store.gender, store.colorPreference, store.prediction, store.recommendations, store.bodyMeasurements]);
+  }, [store.requirements, store.occasion, store.prediction, store.recommendations, store.bodyMeasurements]);
 
   const recommendations = (
     store.recommendations.length > 0
