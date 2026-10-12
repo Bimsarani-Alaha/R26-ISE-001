@@ -4,7 +4,7 @@ import { ImagePlus, ChevronDown, UploadCloud } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent, type DragEvent } from "react";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
-import defaultPreviewImage from "./images/ColourTab1.png";
+import defaultPreviewImage from "./Images/ColourTab1.png";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/";
 
