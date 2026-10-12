@@ -3,7 +3,7 @@ import cv2
 import numpy as np  # mathematical calculations
 
 model_path = "Y26sizeEnginev6.0.pt"
-image_path = "img63.jpeg"
+image_path = "test1.jpeg"
 
 # User manually enters their actual height in centimeters
 # This value will later come from your backend/frontend.
@@ -169,18 +169,8 @@ else:
 
 
 # --------------------------------------------------
-# SHOW RESULT
-# --------------------------------------------------
-
-cv2.imshow("Pose Detection", annotated_img)
-
-cv2.waitKey(0)
-
-cv2.destroyAllWindows()
-
-
-# --------------------------------------------------
 # SAVE OUTPUT IMAGE
 # --------------------------------------------------
 
-cv2.imwrite("output.jpg", annotated_img)
+if not cv2.imwrite("output.jpg", annotated_img):
+    raise OSError("Could not save annotated image to output.jpg")

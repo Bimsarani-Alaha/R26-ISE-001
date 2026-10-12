@@ -354,6 +354,16 @@ export default function SizePage() {
             <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
               {cameraOpen ? (
                 <div className="border border-dashed border-[#d7d7d7] bg-white p-3">
+                  <p
+                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-3 py-2 text-sm leading-6 text-[#555]"
+                    style={SANS}
+                  >
+                    Taking a photo with a mobile phone? Stand about{" "}
+                    <strong className="font-semibold text-[#111]">
+                      2 m (6.5 ft) away from the camera
+                    </strong>{" "}
+                    and make sure your full body is in the frame.
+                  </p>
                   <video
                     ref={videoRef}
                     autoPlay
