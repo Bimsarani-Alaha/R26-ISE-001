@@ -83,7 +83,16 @@ class QwenService:
 
         full_prompt = f"{self.stylist_prompt}\n\n{context}"
 
-        raw_response = await self._call_ollama(full_prompt)
+        # Resolve product image so qwen3-vl:8b scans image + metadata together.
+        raw_image_ref = image_path or product_metadata.get("image_path")
+        resolved = self._resolve_image(raw_image_ref) if raw_image_ref else None
+        images = [resolved] if resolved else None
+        if resolved:
+            logger.info(f"Stylist vision: sending image {resolved} to {QWEN_MODEL}")
+        else:
+            logger.info("Stylist vision: no product image found, using text-only advice")
+
+        raw_response = await self._call_ollama(full_prompt, images=images)
         return self._parse_json_response(raw_response)
 
     def _resolve_image(self, image_path: str) -> Optional[str]:
