@@ -10,7 +10,11 @@ build/
 Thumbs.db
 *.log
 results/
+.cache/
+.pytest_cache/
+.pytest-tmp-cartographer/
 
 .superpowers
 docs
-images
+images/
+Images/
