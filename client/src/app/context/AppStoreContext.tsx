@@ -34,11 +34,13 @@ const readStorageValue = <T,>(key: string, fallback: T): T => {
 type AppStore = {
   requirements: string;
   occasion: string;
+  gender: string;
   prediction: BackendPrediction | null;
   recommendations: ClothingItem[];
   bodyMeasurements: BodyMeasurements | null;
   setRequirements: (v: string) => void;
   setOccasion: (v: string) => void;
+  setGender: (v: string) => void;
   setPrediction: (v: BackendPrediction | null) => void;
   setRecommendations: (v: ClothingItem[]) => void;
   setBodyMeasurements: (v: BodyMeasurements | null) => void;
@@ -94,11 +96,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     () => ({
       requirements,
       occasion,
+      gender,
       prediction,
       recommendations,
       bodyMeasurements,
       setRequirements,
       setOccasion,
+      setGender,
       setPrediction,
       setRecommendations,
       setBodyMeasurements,
@@ -106,6 +110,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [
       requirements,
       occasion,
+      gender,
       prediction,
       recommendations,
       bodyMeasurements,
