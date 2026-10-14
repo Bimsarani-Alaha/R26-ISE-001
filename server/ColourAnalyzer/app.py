@@ -31,6 +31,14 @@ from model_color import ColorAnalyzer, remove_background, cleanup_mask
 from model_cvd import CVDTransformer
 from model_pattern import PatternTransformer
 
+
+from openai import OpenAI
+
+OPENAI_API_KEY = "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"
+
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+OPENAI_MODEL = "gpt-4.1-mini"
+
 # ============================================
 # PYDANTIC MODELS FOR REQUEST/VALIDATION
 # ============================================
@@ -56,8 +64,8 @@ class BatchRequest(BaseModel):
 
 app = FastAPI(
     title="T-Shirt Color Analyzer + CVD Generator + Pattern Recognizer API",
-    description="Multi-model API for fashion analysis including multi-colour classification, CVD simulation, and pattern recognition",
-    version="5.0.0"
+    description="Multi-model API for fashion analysis including multi-colour classification, CVD simulation, pattern recognition, and AI pattern description",
+    version="6.0.0"
 )
 
 # CORS Middleware
@@ -84,7 +92,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
 
-# Model 2 / Model 3 are already version-agnostic (npz weights + json config)
 CVD_WEIGHTS_PATH = os.path.join(MODELS_DIR, 'cvd_generator_weights.npz')
 CVD_CONFIG_PATH = os.path.join(MODELS_DIR, 'preprocessing_config.json')
 PATTERN_WEIGHTS_PATH = os.path.join(MODELS_DIR, 'pattern_model_weights.npz')
@@ -109,6 +116,13 @@ def image_to_base64(image: np.ndarray) -> str:
     """Convert numpy image to base64 string"""
     _, buffer = cv2.imencode('.jpg', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
     return base64.b64encode(buffer).decode('utf-8')
+
+def numpy_rgb_to_base64_jpeg(image: np.ndarray, quality: int = 85) -> str:
+    """Convert numpy RGB image to base64 JPEG (for OpenAI)."""
+    pil = Image.fromarray(image)
+    buf = BytesIO()
+    pil.save(buf, format="JPEG", quality=quality)
+    return base64.b64encode(buf.getvalue()).decode('utf-8')
 
 async def save_upload_file(upload_file: UploadFile) -> str:
     """Save uploaded file and return path"""
@@ -147,7 +161,6 @@ def get_analyzer() -> ColorAnalyzer:
     if analyzer is None:
         print("📦 Loading Model 1 (Multi-Colour Analyzer v6)...")
         try:
-            # CHANGED: single directory, not four separate .keras/.json paths.
             analyzer = ColorAnalyzer(MODELS_DIR)
             print(f"✅ Model 1 loaded! Base classes: {analyzer.class_names}")
         except Exception as e:
@@ -182,6 +195,68 @@ def get_pattern_model() -> PatternTransformer:
     return pattern_model
 
 # ============================================
+# OPENAI PATTERN DESCRIPTION HELPER
+# ============================================
+
+def describe_pattern_with_openai(img_rgb: np.ndarray) -> dict:
+    """
+    Send the t-shirt image to OpenAI and get a short, clean pattern description.
+    Returns: { pattern_title, description }
+    """
+    img_b64 = numpy_rgb_to_base64_jpeg(img_rgb, quality=85)
+
+    system_prompt = (
+        "You are a fashion pattern analyst. "
+        "You identify the print or pattern on garments. "
+        "You respond ONLY with valid JSON. No markdown. No extra text."
+    )
+
+    user_prompt = """Look at the t-shirt in this image and return a JSON object with EXACTLY these two keys:
+
+{
+  "pattern_title": "Short title of the pattern, e.g. 'Striped Pattern', 'Floral Print', 'Solid Colour', 'Plaid Pattern', 'Graphic Print'",
+  "description": "One short, direct sentence describing the pattern. Mention the layout and the look in plain English. Example: 'The garment features evenly spaced, parallel stripes with alternating colours, creating a repeated linear design.'"
+}
+
+Rules:
+- pattern_title must be 2-3 words ending in the type, e.g. 'Striped Pattern', 'Floral Print', 'Solid Colour'.
+- description must be ONE sentence, 15-30 words, plain English, no filler words like 'this image shows' or 'the t-shirt has'.
+- If plain with no pattern: pattern_title = 'Solid Colour', description = 'The garment has a single, uniform colour with no visible pattern.'
+- Do NOT add any other keys. Do NOT wrap in markdown."""
+
+    response = openai_client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{img_b64}",
+                            "detail": "low",
+                        },
+                    },
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.2,
+        max_tokens=200,
+    )
+
+    content = response.choices[0].message.content
+    parsed = json.loads(content)
+
+    # Safe fallbacks
+    parsed.setdefault("pattern_title", "Pattern Analysis")
+    parsed.setdefault("description", "No description available.")
+
+    return parsed
+
+# ============================================
 # HEALTH CHECK ENDPOINT
 # ============================================
 
@@ -192,7 +267,8 @@ async def health_check():
         'status': 'healthy',
         'model1_loaded': analyzer is not None,
         'model2_loaded': cvd_transformer is not None,
-        'model3_loaded': pattern_model is not None
+        'model3_loaded': pattern_model is not None,
+        'openai_model': OPENAI_MODEL,
     }
 
 # ============================================
@@ -206,8 +282,6 @@ async def analyze_image(
 ):
     """
     Analyze uploaded image for colours (Model 1 - Multi-Colour Analyzer v6).
-    Set has_person=true if the photo shows a person wearing the shirt
-    (so skin tones get excluded from the colour analysis).
     """
     temp_path = None
     try:
@@ -216,7 +290,6 @@ async def analyze_image(
         if not allowed_file(image.filename):
             raise HTTPException(status_code=400, detail="File type not allowed. Use PNG, JPG, JPEG, or WEBP")
 
-        # Save file
         temp_path = await save_upload_file(image)
         print(f"✅ File saved: {temp_path}")
 
@@ -265,9 +338,7 @@ async def analyze_image(
 
 @app.post("/analyze-url")
 async def analyze_url(request: URLRequest):
-    """
-    Analyze image from URL using Model 1 (Multi-Colour Analyzer v6).
-    """
+    """Analyze image from URL using Model 1."""
     try:
         print("📥 Received analyze URL request")
 
@@ -313,9 +384,7 @@ async def generate_cvd_image(
     image: UploadFile = File(...),
     cvd_type: str = Form(...)
 ):
-    """
-    Generate a CVD simulation image using Model 2 from file upload.
-    """
+    """Generate a CVD simulation image using Model 2 from file upload."""
     temp_path = None
     try:
         print("📥 Received CVD generation request")
@@ -366,22 +435,19 @@ async def generate_cvd_image(
 
 @app.post("/generate-cvd-url")
 async def generate_cvd_image_url(request: CVDRequest):
-    """
-    Generate a CVD simulation image from a URL using Model 2.
-    """
+    """Generate a CVD simulation image from a URL using Model 2."""
     try:
         print("📥 Received CVD generation request from URL")
 
         cvd_type = request.cvd_type.lower()
         if cvd_type not in ['protanopia', 'deuteranopia', 'tritanopia']:
-            raise HTTPException(status_code=400, detail="Invalid CVD type. Choose protanopia, deuteranopia, or tritanopia.")
+            raise HTTPException(status_code=400, detail="Invalid CVD type.")
 
         img_rgb = await download_image_from_url(str(request.url))
 
         transformer = get_cvd_transformer()
         print(f"🔍 Generating {cvd_type} simulation from URL...")
         cvd_image_rgb = transformer.transform(img_rgb, cvd_type)
-        print(f"✅ Generation complete. Output shape: {cvd_image_rgb.shape}")
 
         response = {
             'success': True,
@@ -409,9 +475,7 @@ async def classify_batch(
     images: List[UploadFile] = File(...),
     has_person: bool = Form(False)
 ):
-    """
-    Batch classify multiple images using Model 1 (Multi-Colour Analyzer v6)
-    """
+    """Batch classify multiple images using Model 1."""
     if len(images) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 images per batch")
 
@@ -425,7 +489,6 @@ async def classify_batch(
         temp_path = None
         try:
             temp_path = await save_upload_file(file)
-
             result, _img_rgb = analyzer_instance.predict(temp_path, has_person=has_person)
 
             results.append({
@@ -467,10 +530,7 @@ async def classify_batch(
 from sklearn.cluster import KMeans
 
 def preprocess_for_pattern(image: np.ndarray):
-    """
-    Prepares an image for the Pattern Recognizer (Model 3).
-    """
-    # 1. Background Removal (GrabCut + cleanup) - shared with Model 1
+    """Prepares an image for the Pattern Recognizer (Model 3)."""
     mask = remove_background(image)
     mask = cleanup_mask(mask)
 
@@ -506,9 +566,7 @@ def preprocess_for_pattern(image: np.ndarray):
     return input_for_model, binary_mask
 
 def process_pattern_image(img_rgb: np.ndarray):
-    """
-    Common function to process pattern recognition on an RGB image.
-    """
+    """Common function to process pattern recognition on an RGB image."""
     input_for_model, binary_mask = preprocess_for_pattern(img_rgb)
 
     if input_for_model.shape[0] == 0 or input_for_model.shape[1] == 0:
@@ -631,6 +689,74 @@ async def pattern_recognize_url(request: PatternRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================
+# AI PATTERN DESCRIPTION ENDPOINTS (OpenAI gpt-4.1-mini)
+# ============================================
+
+@app.post("/describe-pattern")
+async def describe_pattern(image: UploadFile = File(...)):
+    """
+    Upload a t-shirt image and get an AI-generated pattern description.
+    Powered by OpenAI gpt-4.1-mini.
+    """
+    temp_path = None
+    try:
+        print("📥 Received describe-pattern request")
+
+        if not allowed_file(image.filename):
+            raise HTTPException(status_code=400, detail="File type not allowed. Use PNG, JPG, JPEG, or WEBP")
+
+        temp_path = await save_upload_file(image)
+        print(f"✅ File saved: {temp_path}")
+
+        img = cv2.imread(temp_path)
+        if img is None:
+            raise HTTPException(status_code=400, detail="Could not read image file")
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        print("🤖 Calling OpenAI for pattern description...")
+        result = describe_pattern_with_openai(img_rgb)
+        print(f"✅ Description generated: {result.get('pattern_title')}")
+
+        return JSONResponse(content={"success": True, **result})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in describe_pattern: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+                print("✅ Temp file cleaned")
+            except Exception as cleanup_err:
+                print(f"⚠️  Could not remove temp file: {cleanup_err}")
+
+@app.post("/describe-pattern-url")
+async def describe_pattern_url(request: PatternRequest):
+    """Describe pattern from a URL using OpenAI gpt-4.1-mini."""
+    try:
+        print("📥 Received describe-pattern request from URL")
+
+        img_rgb = await download_image_from_url(str(request.url))
+
+        print("🤖 Calling OpenAI for pattern description...")
+        result = describe_pattern_with_openai(img_rgb)
+        print(f"✅ Description generated: {result.get('pattern_title')}")
+
+        return JSONResponse(content={"success": True, **result})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ ERROR in describe_pattern_url: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================
 # ROOT ENDPOINT
 # ============================================
 
@@ -639,36 +765,37 @@ async def root():
     """Root endpoint with API information"""
     return {
         "name": "T-Shirt Color Analyzer + CVD Generator + Pattern Recognizer API",
-        "version": "5.0.0",
+        "version": "6.0.0",
         "endpoints": {
             "/health": "Check API health",
-            "/analyze": "Upload image for multi-colour analysis, optional has_person form field (POST)",
-            "/analyze-url": "Analyze image from URL, optional has_person field (POST)",
+            "/analyze": "Upload image for multi-colour analysis (POST)",
+            "/analyze-url": "Analyze image from URL (POST)",
             "/generate-cvd": "Generate CVD simulation from upload (POST)",
             "/generate-cvd-url": "Generate CVD simulation from URL (POST)",
-            "/classify-batch": "Batch classify multiple images, optional has_person form field (POST)",
+            "/classify-batch": "Batch classify multiple images (POST)",
             "/pattern-recognize": "Recognize pattern from upload (POST)",
-            "/pattern-recognize-url": "Recognize pattern from URL (POST)"
+            "/pattern-recognize-url": "Recognize pattern from URL (POST)",
+            "/describe-pattern": "AI pattern description from upload (POST)",
+            "/describe-pattern-url": "AI pattern description from URL (POST)"
         }
     }
 
 # ============================================
-# RUN SERVER (standalone testing only -- normally mounted by server.py)
+# RUN SERVER (standalone testing only)
 # ============================================
 
 if __name__ == '__main__':
     import uvicorn
 
     print("=" * 50)
-    print("🚀 T-Shirt Color Analyzer + CVD Generator + Pattern Recognizer API (v5)")
+    print("🚀 T-Shirt Color Analyzer + CVD + Pattern + AI Description API (v6)")
     print("=" * 50)
     print(f"📁 Model 1 (Colour Analyzer) directory: {MODELS_DIR}")
     print(f"📁 Model 2 (CVD Transformer): {CVD_WEIGHTS_PATH}")
     print(f"📁 Model 3 (Pattern Recognizer): {PATTERN_WEIGHTS_PATH}")
+    print(f"🤖 OpenAI model: {OPENAI_MODEL}")
     print("🌐 Server running at http://localhost:5000")
     print("📚 API Docs at http://localhost:5000/docs")
-    print("=" * 50)
-    print("ℹ️  Models will load on first request (lazy loading)")
     print("=" * 50)
 
     uvicorn.run(
