@@ -36,6 +36,13 @@ export interface ColorResult {
   detail?: string;
 }
 
+export interface PatternDescription {
+  success: boolean;
+  pattern_title: string;
+  description: string;
+  detail?: string;
+}
+
 function base64ToFile(base64: string, filename: string, mime = "image/jpeg"): File {
   const byteChars = atob(base64);
   const byteNumbers = new Array(byteChars.length);
@@ -169,6 +176,19 @@ async function generatePatternView(imageFile: File, onStage: (s: string) => void
   return work;
 }
 
+// ----- AI pattern description call -----
+async function describePatternAI(imageFile: File): Promise<PatternDescription> {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+  const res = await fetch(`${API_URL}/describe-pattern`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.detail || "Pattern description failed");
+  return data as PatternDescription;
+}
+
 export function CvdTab() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -188,6 +208,11 @@ export function CvdTab() {
   const [patternImage, setPatternImage] = useState<string | null>(null);
   const [patternError, setPatternError] = useState<string | null>(null);
 
+  // AI description state
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<PatternDescription | null>(null);
+
   const applyFile = (f: File | null | undefined) => {
     if (!f) return;
     if (!f.type.startsWith("image/")) {
@@ -204,6 +229,9 @@ export function CvdTab() {
     setPatternImage(null);
     setPatternError(null);
     setPatternStage("");
+    setAiResult(null);
+    setAiError(null);
+    setAiBusy(false);
   };
 
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -253,6 +281,24 @@ export function CvdTab() {
     } finally {
       setPatternBusy(false);
       setPatternStage("");
+    }
+  };
+
+  const handleDescribe = async () => {
+    if (!file) {
+      setError("Please select an image first");
+      return;
+    }
+    setAiBusy(true);
+    setAiResult(null);
+    setAiError(null);
+    try {
+      const out = await describePatternAI(file);
+      setAiResult(out);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Pattern description failed");
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -381,6 +427,16 @@ export function CvdTab() {
         >
           {patternBusy ? "GENERATING…" : "PATTERN GENERATOR"}
         </Button>
+
+        <Button
+          type="button"
+          onClick={handleDescribe}
+          disabled={aiBusy || !file}
+          className="rounded-none border border-[#111] bg-white px-8 py-2.5 text-[11px] tracking-[0.2em] text-[#111] transition-all hover:bg-[#f0f0f0] disabled:border-[#ddd] disabled:bg-[#f5f5f5] disabled:text-[#999]"
+          style={SANS}
+        >
+          {aiBusy ? "DESCRIBING…" : "PATTERN DESCRIBE"}
+        </Button>
       </div>
 
       {error && (
@@ -463,6 +519,7 @@ export function CvdTab() {
         />
       )}
 
+      {/* PATTERN GENERATOR SECTION */}
       {(patternBusy || patternImage || patternError) && (
         <div className="border-t border-[#e8e8e8] bg-[#fafafa] p-6 md:p-8">
           <p className="mb-1 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
@@ -523,6 +580,75 @@ export function CvdTab() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* AI PATTERN DESCRIPTION SECTION */}
+      {(aiBusy || aiResult || aiError) && (
+        <div className="border-t border-[#e8e8e8] bg-[#fafafa] p-6 md:p-8">
+          <div className="grid gap-6 md:grid-cols-[1fr_1.4fr]">
+            {/* Left: uploaded image */}
+            <div>
+              <p className="mb-3 text-[10px] tracking-[0.2em] text-[#aaa]" style={SANS}>
+                UPLOADED GARMENT
+              </p>
+              <div className="flex min-h-[420px] items-center justify-center border border-[#e8e8e8] bg-white p-4">
+                {preview && (
+                  <img
+                    src={preview}
+                    alt="Uploaded garment"
+                    className="max-h-[560px] w-full object-contain"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Right: AI result */}
+            <div className="border border-[#e8e8e8] bg-white p-6">
+              <p className="mb-1 text-[10px] tracking-[0.25em] text-[#aaa]" style={SANS}>
+                PATTERN IDENTIFICATION
+              </p>
+
+              {aiBusy && (
+                <div className="flex min-h-48 flex-col items-center justify-center gap-4">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#ddd] border-t-[#111]" />
+                  <p className="text-sm text-[#666]" style={SANS}>
+                    Analysing pattern…
+                  </p>
+                </div>
+              )}
+
+              {aiError && !aiBusy && (
+                <p
+                  className="mt-4 border border-[#f1cfc7] bg-[#fbeae6] px-4 py-3 text-xs leading-6 text-[#9a3b2e]"
+                  style={SANS}
+                >
+                  {aiError}
+                </p>
+              )}
+
+              {aiResult && !aiBusy && (
+                <div className="mt-1">
+                  <h4
+                    className="mb-5 text-2xl text-[#111]"
+                    style={{ ...SERIF, fontWeight: 500 }}
+                  >
+                    {aiResult.pattern_title}
+                  </h4>
+
+                  <p
+                    className="mb-2 text-[10px] tracking-[0.25em] text-[#aaa]"
+                    style={SANS}
+                  >
+                    PATTERN DESCRIPTION
+                  </p>
+                  <p className="text-sm leading-7 text-[#333]" style={SANS}>
+                    {aiResult.description}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </form>
