@@ -10,6 +10,16 @@ import { Button } from "@/app/components/ui/button";
 import { useAppStore } from "@/app/context/AppStoreContext";
 import { fetchHealthTips } from "@/app/lib/healthTipsApi";
 
+function formatHealthTipsError(message: string): string {
+  const normalized = message.trim();
+
+  if (/ollama|qwen2\.5:3b/i.test(normalized)) {
+    return "The local Ollama guidance service is unavailable. Please start the qwen2.5:3b model in Ollama to generate your body appearance guide.";
+  }
+
+  return normalized || "Unable to generate body guidance.";
+}
+
 export default function HealthTipsPage() {
   const router = useRouter();
   const { bodyMeasurements } = useAppStore();
@@ -39,11 +49,9 @@ export default function HealthTipsPage() {
       })
       .catch((requestError: unknown) => {
         if (!cancelled) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : "Unable to generate body guidance.",
-          );
+          const message =
+            requestError instanceof Error ? requestError.message : "Unable to generate body guidance.";
+          setError(formatHealthTipsError(message));
         }
       })
       .finally(() => {
@@ -68,11 +76,9 @@ export default function HealthTipsPage() {
     })
       .then((result) => setGuidance(result.guidance))
       .catch((requestError: unknown) => {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Unable to generate body guidance.",
-        );
+        const message =
+          requestError instanceof Error ? requestError.message : "Unable to generate body guidance.";
+        setError(formatHealthTipsError(message));
       })
       .finally(() => setLoading(false));
   };
@@ -134,7 +140,6 @@ export default function HealthTipsPage() {
           className="mt-12 min-h-64 border border-[#ddd] bg-white p-7 md:p-10"
         >
           <div className="flex items-center gap-3 border-b border-[#eee] pb-5">
-            <Sparkles className="h-4 w-4 text-[#777]" />
             <h2 className="text-xs tracking-[0.25em] text-[#333]" style={SANS}>YOUR GUIDANCE</h2>
           </div>
           {loading && <p className="mt-8 text-sm text-[#888]" style={SANS}>Preparing your guidance...</p>}

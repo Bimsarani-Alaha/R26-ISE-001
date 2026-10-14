@@ -19,7 +19,7 @@ type Measurement = {
 
 export default function SizePage() {
   const router = useRouter();
-  const { setBodyMeasurements } = useAppStore();
+  const { gender: savedGender, setBodyMeasurements, setGender } = useAppStore();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [resultImage, setResultImage] = useState<string>("");
@@ -27,7 +27,7 @@ export default function SizePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [height, setHeight] = useState("");
-  const [gender, setGender] = useState("Women");
+  const [gender, setGenderState] = useState(savedGender || "Women");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -120,6 +120,15 @@ export default function SizePage() {
     }, "image/jpeg", 0.92);
   };
 
+  useEffect(() => {
+    setGenderState(savedGender || "Women");
+  }, [savedGender]);
+
+  const updateGender = (nextGender: string) => {
+    setGenderState(nextGender);
+    setGender(nextGender);
+  };
+
   const handleUpload = async () => {
     if (!file) {
       setMessage("Please select an image before predicting.");
@@ -145,7 +154,7 @@ export default function SizePage() {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:8000/predict", {
+      const res = await fetch("http://localhost:8000/predict", { //size prediction API
         method: "POST",
         body: formData,
       });
@@ -345,6 +354,16 @@ export default function SizePage() {
             <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
               {cameraOpen ? (
                 <div className="border border-dashed border-[#d7d7d7] bg-white p-3">
+                  <p
+                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-3 py-2 text-sm leading-6 text-[#555]"
+                    style={SANS}
+                  >
+                    Taking a photo with a mobile phone? Stand about{" "}
+                    <strong className="font-semibold text-[#111]">
+                      2 m (6.5 ft) away from the camera
+                    </strong>{" "}
+                    and make sure your full body is in the frame.
+                  </p>
                   <video
                     ref={videoRef}
                     autoPlay
@@ -446,7 +465,7 @@ export default function SizePage() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setGender(option)}
+                      onClick={() => updateGender(option)}
                       className={`rounded-none border px-4 py-2 text-xs tracking-[0.12em] transition-all ${
                         gender === option
                           ? "bg-[#111] text-white border-[#111]"

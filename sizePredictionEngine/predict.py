@@ -3,16 +3,16 @@ import cv2
 import numpy as np  # mathematical calculations
 
 model_path = "Y26sizeEnginev6.0.pt"
-image_path = "img63.jpeg"
+image_path = "test1.jpeg"
 
 # User manually enters their actual height in centimeters
 # This value will later come from your backend/frontend.
 real_height = 182.88   # in centimeters
 
 
-model = YOLO(model_path)
+model = YOLO(model_path)#load the YOLOv8 model
 
-result = model(image_path, conf=0.8)[0]  # run pose detection
+result = model(image_path, conf=0.8)[0]  # run pose detection only keep 80% confidence detections
 
 # Draw detections
 annotated_img = result.plot()
@@ -169,18 +169,8 @@ else:
 
 
 # --------------------------------------------------
-# SHOW RESULT
-# --------------------------------------------------
-
-cv2.imshow("Pose Detection", annotated_img)
-
-cv2.waitKey(0)
-
-cv2.destroyAllWindows()
-
-
-# --------------------------------------------------
 # SAVE OUTPUT IMAGE
 # --------------------------------------------------
 
-cv2.imwrite("output.jpg", annotated_img)
+if not cv2.imwrite("output.jpg", annotated_img):
+    raise OSError("Could not save annotated image to output.jpg")
