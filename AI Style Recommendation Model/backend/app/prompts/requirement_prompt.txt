@@ -29,7 +29,7 @@ Sleeveless, Short Sleeve, Half Sleeve, Three-Quarter Sleeve, Full Sleeve, Cap Sl
 RULES:
 1. For article_types: If customer says "saree", use "Saree". If they say "dress", use "Dress". Match EXACTLY to valid types above.
 2. For preferred_colors: Extract the EXACT color mentioned. "blue" = "Blue", "navy blue" = "Navy Blue", "light blue" = "Light Blue".
-3. For occasion: If customer says "wedding", use "Wedding". If "party", use "Party". If not mentioned, set to null.
+3. For occasion: Extract explicitly requested occasions as a list. "wedding" = ["Wedding"], "party" = ["Party"], "casual wear" or "everyday wear" = ["Casual"], "formal wear" = ["Formal"]. Set to null only when no occasion or intended use is stated.
 4. Only extract explicitly stated requirements. Do NOT infer or guess.
 5. price_preference: {"max": N} or {"min": N} or null
 6. Return ONLY valid JSON, no other text.
@@ -37,8 +37,13 @@ RULES:
 8. "office wear", "office", and "workwear" use occasion ["Office"]. Preserve explicit colours and clothing types even when no exact product may exist.
 9. A clothing type or colour alone never implies an occasion. "blue dress" must have occasion null. Do not infer Wedding from Dress, or Formal from Shirt.
 10. When no colour is mentioned, preferred_colors must be []. Do not choose a default colour. Preserve explicitly requested shades, including Dark Blue, Sky Blue, and Royal Blue.
+11. "for casual wear", "for casual outings", and "for everyday wear" specify the Casual occasion, even if a season is also mentioned. Do not omit the occasion or put the intended use only in style_preferences. Extract style_preferences only for a separately requested style. Do not treat a negated occasion (e.g. "not for casual wear") as requested.
+12. Preserve explicitly requested seasons in other_requirements (e.g. ["Summer"]). A season alone does not imply an occasion or a material.
 
 EXAMPLE:
+Customer request: "A white color dress for casual wear in summer"
+Response: {"occasion": ["Casual"], "preferred_colors": ["White"], "article_types": ["Dress"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": ["Summer"], "price_preference": null}
+
 Customer request: "I need a blue dress"
 Response: {"occasion": null, "preferred_colors": ["Blue"], "article_types": ["Dress"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
 
