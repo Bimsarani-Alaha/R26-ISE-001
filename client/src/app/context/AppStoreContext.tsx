@@ -13,6 +13,7 @@ import type { BackendPrediction } from "@/app/lib/recommendationApi";
 
 const GENDER_STORAGE_KEY = "styleai-gender";
 const BODY_MEASUREMENTS_STORAGE_KEY = "styleai-body-measurements";
+const PREDICTED_SIZE_STORAGE_KEY = "styleai-predicted-size";
 
 const readStorageValue = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") {
@@ -38,12 +39,15 @@ type AppStore = {
   prediction: BackendPrediction | null;
   recommendations: ClothingItem[];
   bodyMeasurements: BodyMeasurements | null;
+  predictedSize: string | null;
+  storageLoaded: boolean;
   setRequirements: (v: string) => void;
   setOccasion: (v: string) => void;
   setGender: (v: string) => void;
   setPrediction: (v: BackendPrediction | null) => void;
   setRecommendations: (v: ClothingItem[]) => void;
   setBodyMeasurements: (v: BodyMeasurements | null) => void;
+  setPredictedSize: (v: string | null) => void;
 };
 
 export type BodyMeasurements = {
@@ -59,30 +63,52 @@ const AppStoreContext = createContext<AppStore | null>(null);
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [requirements, setRequirements] = useState("");
   const [occasion, setOccasion] = useState("");
-  const [gender, setGenderState] = useState<string>(() =>
-    readStorageValue<string>(GENDER_STORAGE_KEY, ""),
-  );
+  const [gender, setGenderState] = useState("");
   const [colorPreference, setColorPreference] = useState("");
   const [prediction, setPrediction] = useState<BackendPrediction | null>(null);
   const [recommendations, setRecommendations] = useState<ClothingItem[]>([]);
-  const [bodyMeasurements, setBodyMeasurementsState] = useState<BodyMeasurements | null>(() =>
-    readStorageValue<BodyMeasurements | null>(BODY_MEASUREMENTS_STORAGE_KEY, null),
-  );
+  const [bodyMeasurements, setBodyMeasurementsState] =
+    useState<BodyMeasurements | null>(null);
+  const [predictedSize, setPredictedSizeState] = useState<string | null>(null);
+  const [storageLoaded, setStorageLoaded] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    setGenderState(readStorageValue<string>(GENDER_STORAGE_KEY, ""));
+    setBodyMeasurementsState(
+      readStorageValue<BodyMeasurements | null>(
+        BODY_MEASUREMENTS_STORAGE_KEY,
+        null,
+      ),
+    );
+    setPredictedSizeState(
+      readStorageValue<string | null>(PREDICTED_SIZE_STORAGE_KEY, null),
+    );
+    setStorageLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (storageLoaded) {
       window.localStorage.setItem(GENDER_STORAGE_KEY, JSON.stringify(gender));
     }
-  }, [gender]);
+  }, [gender, storageLoaded]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (storageLoaded) {
       window.localStorage.setItem(
         BODY_MEASUREMENTS_STORAGE_KEY,
         JSON.stringify(bodyMeasurements),
       );
     }
-  }, [bodyMeasurements]);
+  }, [bodyMeasurements, storageLoaded]);
+
+  useEffect(() => {
+    if (storageLoaded) {
+      window.localStorage.setItem(
+        PREDICTED_SIZE_STORAGE_KEY,
+        JSON.stringify(predictedSize),
+      );
+    }
+  }, [predictedSize, storageLoaded]);
 
   const setGender = (v: string) => {
     setGenderState(v);
@@ -90,6 +116,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const setBodyMeasurements = (v: BodyMeasurements | null) => {
     setBodyMeasurementsState(v);
+  };
+
+  const setPredictedSize = (v: string | null) => {
+    setPredictedSizeState(v);
   };
 
   const value = useMemo(
@@ -100,12 +130,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       prediction,
       recommendations,
       bodyMeasurements,
+      predictedSize,
+      storageLoaded,
       setRequirements,
       setOccasion,
       setGender,
       setPrediction,
       setRecommendations,
       setBodyMeasurements,
+      setPredictedSize,
     }),
     [
       requirements,
@@ -114,6 +147,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       prediction,
       recommendations,
       bodyMeasurements,
+      predictedSize,
+      storageLoaded,
     ],
   );
 

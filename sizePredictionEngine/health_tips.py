@@ -116,21 +116,10 @@ def _call_ollama(prompt: str, model: str, base_url: str, retries: int = 3) -> st
     ) from last_error
 
 
-async def generate_health_tips(
-    shoulder_width: float,
-    hip_size: float,
-    height: float,
-    gender: str,
-    clothing_size: str = "unspecified",
-) -> str:
-    proportion = shoulder_width / hip_size if hip_size else 1.0
-    body_proportion = (
-        "upper-body dominant"
-        if proportion > 1.1
-        else "lower-body dominant"
-        if proportion < 0.9
-        else "balanced"
-    )
+async def generate_health_tips(clothing_size: str) -> str:
+    normalized_size = clothing_size.strip()
+    if not normalized_size:
+        raise ValueError("A predicted clothing size is required for guidance.")
 
     model = (os.getenv("OLLAMA_MODEL") or "qwen2.5:3b").strip()
     base_url = (os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").strip()
@@ -142,14 +131,8 @@ async def generate_health_tips(
 
     logger.info("Using local Ollama model %s at %s", model, base_url)
 
-    prompt = f"""You are a body appearance and wellness coach. Provide a warm, supportive, body-positive, and concise body appearance guide based on the following estimated measurements:
-- Gender: {gender}
-- Shoulder width: {shoulder_width} cm
-- Hip width: {hip_size} cm
-- Height: {height} cm
-- Clothing size: {clothing_size}
-- Body proportion: {body_proportion}
+    prompt = f"""You are a supportive general-wellness guide. The only user information available is their predicted clothing size: {normalized_size}.
 
-Focus on the person's overall body proportions, silhouette, posture, physical activity, mobility, hydration, balanced nutrition, and healthy daily habits. Explain the estimated body frame or proportion in a respectful and neutral way. Provide practical guidance that supports confidence, good posture, regular movement, and general wellbeing. Do not recommend clothing styles, necklines, waist emphasis, outfits, or fashion choices. Do not judge, rank, or label the body as attractive/unattractive, ideal/non-ideal, healthy/unhealthy, or use negative body-shaming language. Do not make medical claims, diagnose conditions, or suggest weight-loss or weight-gain targets. Make it clear that the measurements are estimates for general guidance and are not a medical assessment. Limit the response to 6-8 clear sentences."""
+Give a warm, body-positive set of practical everyday wellness tips, such as comfortable movement, rest, hydration, balanced meals, and self-confidence. Do not infer body shape, proportions, fitness, health, gender, age, or lifestyle from clothing size. Explain briefly that clothing size is only an approximate fit label and is not a measure of health. Do not recommend weight loss or gain, diagnose conditions, make medical claims, judge bodies, or recommend outfits or fashion. Keep the advice general, respectful, and concise in 5-6 clear sentences."""
 
     return await asyncio.to_thread(_call_ollama, prompt, model, base_url)
