@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
+from starlette.concurrency import run_in_threadpool
 from ..schemas.models import (
     RecommendationRequest,
     RecommendationResponse,
@@ -44,6 +45,10 @@ def _export_results_to_json(
         "response": {
             "recommendations": [
                 {
+                    "match_category": r.match_category,
+                    "colour_match": r.colour_match,
+                    "unmatched_requirements": r.unmatched_requirements,
+                    "unverified_requirements": r.unverified_requirements,
                     "product_id": r.product_id,
                     "article_type": r.article_type,
                     "base_colour": r.base_colour,
@@ -52,6 +57,8 @@ def _export_results_to_json(
                     "price": r.price,
                     "selected_size": r.selected_size,
                     "match_score": r.match_score,
+                    "reranker_score": r.reranker_score,
+                    "visual_score": r.visual_score,
                     "explanation": r.explanation,
                     "category": r.category,
                     "pattern": r.pattern,
@@ -63,6 +70,7 @@ def _export_results_to_json(
                 }
                 for r in response.recommendations
             ],
+            "alternatives": [r.model_dump() for r in response.alternatives],
             "occasion_used": response.occasion_used,
             "total_candidates": response.total_candidates,
             "message": response.message,
@@ -108,7 +116,7 @@ async def get_recommendations(request: RecommendationRequest):
         elif isinstance(occasion, str):
             occasion = [occasion] if occasion.strip() else None
         elif isinstance(occasion, list):
-            occasion = [o for o in occasion if o.strip()] if occasion else None
+            occasion = [o.strip() for o in occasion if o.strip()] or None
 
         req_model = RequirementResponse(
             occasion=occasion,
@@ -140,38 +148,34 @@ async def get_recommendations(request: RecommendationRequest):
         message = None
 
         if total_candidates == 0:
-            gender_filtered = recommendation_service.filter_by_gender(df, request.gender)
-            size_filtered = recommendation_service.filter_by_size(gender_filtered, request.size)
-
-            if len(size_filtered) > 0:
-                candidates = size_filtered
-                total_candidates = len(candidates)
-                message = "No exact match was found. Here are the closest available options in your selected size."
-            else:
-                progress.finish()
-                return RecommendationResponse(
-                    recommendations=[],
-                    occasion_used=occasion,
-                    total_candidates=0,
-                    message="No products found matching your gender and size.",
-                )
+            progress.finish()
+            return RecommendationResponse(
+                recommendations=[],
+                occasion_used=occasion,
+                total_candidates=0,
+                message="No products match your requested clothing type, occasion, gender, size and budget.",
+            )
 
         with progress.stage("Scoring & ranking"):
             logger.info(f"AI extracted article_types: {req_model.article_types}")
             logger.info(f"AI extracted preferred_colors: {req_model.preferred_colors}")
             logger.info(f"AI extracted occasion: {req_model.occasion}")
-            ranked = ranking_service.calculate_scores(candidates, req_model, request.size)
+            ranked, alternatives = await run_in_threadpool(
+                ranking_service.calculate_groups, candidates, req_model, request.size,
+                query=request.requirements,
+            )
 
-        logger.info(f"Recommendations (after threshold filter):")
+        logger.info("Exact recommendations: %d; similar alternatives: %d", len(ranked), len(alternatives))
         for i, product in enumerate(ranked, 1):
             logger.info(f"  {i}. {product.product_id}: {product.article_type}, {product.base_colour}, "
                        f"Occasion: {product.occasion}, Score: {product.match_score}")
 
         if len(ranked) == 0 and total_candidates > 0:
-            message = "No products strongly matching your requirements were found. Try broadening your search."
+            message = "No products match all your requirements. Similar alternatives are shown separately."
 
         response = RecommendationResponse(
             recommendations=ranked,
+            alternatives=alternatives,
             occasion_used=occasion,
             total_candidates=total_candidates,
             message=message,

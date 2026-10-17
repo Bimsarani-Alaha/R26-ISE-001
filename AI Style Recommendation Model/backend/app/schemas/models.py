@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 
 class RequirementRequest(BaseModel):
@@ -26,6 +26,10 @@ class RecommendationRequest(BaseModel):
 
 
 class ProductResult(BaseModel):
+    match_category: Literal["exact", "alternative"] = "exact"
+    colour_match: Literal["exact", "shade", "different", "unknown", "unspecified"] = "unspecified"
+    unmatched_requirements: list[str] = Field(default_factory=list)
+    unverified_requirements: list[str] = Field(default_factory=list)
     product_id: str
     image_path: str
     article_type: str
@@ -35,6 +39,8 @@ class ProductResult(BaseModel):
     price: Optional[float] = None
     selected_size: str
     match_score: float
+    reranker_score: Optional[float] = None
+    visual_score: Optional[float] = None
     explanation: str
     category: str
     pattern: str
@@ -46,6 +52,7 @@ class ProductResult(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: list[ProductResult]
+    alternatives: list[ProductResult] = Field(default_factory=list)
     occasion_used: Optional[list[str]] = None
     total_candidates: int
     message: Optional[str] = None
