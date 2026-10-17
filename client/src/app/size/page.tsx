@@ -34,7 +34,6 @@ type PoseReadiness = {
 export default function SizePage() {
   const router = useRouter();
   const {
-    bodyMeasurements,
     gender: savedGender,
     setBodyMeasurements,
     setGender,
@@ -419,14 +418,37 @@ export default function SizePage() {
         throw new Error(detail);
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        annotated_image?: string;
+        measurements?: Measurement[];
+      };
+      const predictionMeasurements = data.measurements ?? [];
+      const firstMeasurement = predictionMeasurements[0];
 
-      setResultImage(data.annotated_image);
-      setMeasurements(data.measurements || []);
-      setPredictedSize(data.measurements?.[0]?.size ?? null);
-      setBodyMeasurements(null);
+      setResultImage(data.annotated_image ?? "");
+      setMeasurements(predictionMeasurements);
+      setPredictedSize(firstMeasurement?.size ?? null);
+      if (
+        firstMeasurement?.size &&
+        typeof firstMeasurement.height_cm === "number" &&
+        Number.isFinite(firstMeasurement.height_cm) &&
+        typeof firstMeasurement.shoulder_cm === "number" &&
+        Number.isFinite(firstMeasurement.shoulder_cm) &&
+        typeof firstMeasurement.hip_cm === "number" &&
+        Number.isFinite(firstMeasurement.hip_cm)
+      ) {
+        setBodyMeasurements({
+          heightCm: firstMeasurement.height_cm,
+          shoulderCm: firstMeasurement.shoulder_cm,
+          hipCm: firstMeasurement.hip_cm,
+          gender,
+          clothingSize: firstMeasurement.size,
+        });
+      } else {
+        setBodyMeasurements(null);
+      }
 
-      if (!data.measurements || data.measurements.length === 0) {
+      if (predictionMeasurements.length === 0) {
         setMessage("No full-body pose was detected. Try a clear image with your full body in frame.");
       }
     } catch (err) {
@@ -454,7 +476,7 @@ export default function SizePage() {
               key={item.label}
               type="button"
               onClick={() => router.push(item.href)}
-              className="hidden text-xs tracking-[0.15em] text-[#111] transition-colors hover:text-[#888] md:block"
+              className="hidden text-sm tracking-[0.15em] text-[#111] transition-colors hover:text-[#888] md:block"
               style={{ ...SANS, fontWeight: 400 }}
             >
               {item.label}
@@ -471,7 +493,7 @@ export default function SizePage() {
             onClick={() => router.push("/input")}
             variant="ghost"
             size="sm"
-            className="hidden h-auto rounded-none bg-transparent p-0 text-xs tracking-[0.15em] text-[#111] hover:bg-transparent hover:text-[#888] md:block"
+            className="hidden h-auto rounded-none bg-transparent p-0 text-sm tracking-[0.15em] text-[#111] hover:bg-transparent hover:text-[#888] md:block"
             style={{ ...SANS, fontWeight: 400 }}
           >
             LOGIN
@@ -480,7 +502,7 @@ export default function SizePage() {
             onClick={() => router.push("/size")}
             variant="outline"
             size="sm"
-            className="h-auto rounded-none border-[#111] px-2.5 py-1.5 text-[10px] tracking-[0.1em] text-[#111] transition-colors hover:bg-[#111] hover:text-white sm:px-4 sm:text-xs sm:tracking-[0.15em]"
+            className="h-auto rounded-none border-[#111] px-2.5 py-1.5 text-xs tracking-[0.1em] text-[#111] transition-colors hover:bg-[#111] hover:text-white sm:px-4 sm:text-sm sm:tracking-[0.15em]"
             style={{ ...SANS, fontWeight: 400 }}
           >
             FIND YOUR SIZE
@@ -525,7 +547,7 @@ export default function SizePage() {
                           .getElementById("size-analysis")
                           ?.scrollIntoView({ behavior: "smooth" })
                       }
-                      className="flex items-center gap-2 rounded-none border border-white bg-white px-6 py-3 text-[11px] tracking-[0.2em] text-[#111] transition-all hover:bg-[#f2f2f2]"
+                      className="flex items-center gap-2 rounded-none border border-white bg-white px-6 py-3 text-sm tracking-[0.12em] text-[#111] transition-all hover:bg-[#f2f2f2]"
                       style={{ ...SANS, fontWeight: 400 }}
                     >
                       START NOW
@@ -534,7 +556,7 @@ export default function SizePage() {
                     <Button
                       onClick={() => router.push("/")}
                       variant="ghost"
-                      className="flex items-center gap-2 rounded-none border border-white/70 bg-transparent px-6 py-3 text-[11px] tracking-[0.2em] text-white transition-all hover:bg-white hover:text-[#111]"
+                      className="flex items-center gap-2 rounded-none border border-white/70 bg-transparent px-6 py-3 text-sm tracking-[0.12em] text-white transition-all hover:bg-white hover:text-[#111]"
                       style={{ ...SANS, fontWeight: 400 }}
                     >
                       BACK HOME
@@ -578,13 +600,13 @@ export default function SizePage() {
                   className="border-b border-[#e5e5e5] pb-4 last:border-b-0 last:pb-0"
                 >
                   <p
-                    className="text-[11px] tracking-[0.25em] text-[#aaa]"
+                    className="text-sm tracking-[0.15em] text-[#777]"
                     style={SANS}
                   >
                     {item.title}
                   </p>
                   <p
-                    className="mt-2 text-sm leading-7 text-[#666]"
+                    className="mt-2 text-base leading-7 text-[#555]"
                     style={SANS}
                   >
                     {item.desc}
@@ -599,7 +621,7 @@ export default function SizePage() {
             className="border border-[#e8e8e8] bg-white p-4 sm:p-10 lg:p-12"
           >
             <div
-              className="mb-4 flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#777]"
+              className="mb-4 flex items-center gap-2 text-sm tracking-[0.15em] text-[#555]"
               style={SANS}
             >
               START YOUR ANALYSIS
@@ -625,7 +647,7 @@ export default function SizePage() {
                   >
                     <span className="block text-sm font-medium">{title}</span>
                     <span
-                      className={`mt-1 block text-xs ${mode === option ? "text-white/70" : "text-[#777]"}`}
+                      className={`mt-1 block text-sm ${mode === option ? "text-white/80" : "text-[#666]"}`}
                     >
                       {subtitle}
                     </span>
@@ -665,7 +687,7 @@ export default function SizePage() {
                       <p
                         role="status"
                         aria-live="polite"
-                        className={`mt-3 border px-3 py-2 text-sm leading-6 ${
+                        className={`mt-3 border px-3 py-2 text-base leading-7 ${
                           poseReady
                             ? "border-[#d4e8d5] bg-[#f0f8f0] text-[#225b2a]"
                             : "border-[#f0e3a2] bg-[#fff9df] text-[#666]"
@@ -679,7 +701,7 @@ export default function SizePage() {
                             type="button"
                             onClick={capturePhoto}
                             disabled={!cameraReady || loading}
-                            className="flex-1 border border-[#111] bg-white px-4 py-2.5 text-sm font-medium text-[#111] transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:border-[#ddd] disabled:text-[#999]"
+                            className="flex-1 border border-[#111] bg-white px-4 py-2.5 text-base font-medium text-[#111] transition hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:border-[#ddd] disabled:text-[#999]"
                           >
                             Capture Photo
                           </button>
@@ -687,7 +709,7 @@ export default function SizePage() {
                         <button
                           type="button"
                           onClick={stopCamera}
-                          className="border border-[#d7d7d7] bg-white px-4 py-2.5 text-sm text-[#555] transition hover:border-[#111] hover:text-[#111]"
+                          className="border border-[#d7d7d7] bg-white px-4 py-2.5 text-base text-[#555] transition hover:border-[#111] hover:text-[#111]"
                         >
                           Cancel
                         </button>
@@ -697,7 +719,7 @@ export default function SizePage() {
                     <button
                       type="button"
                       onClick={openCamera}
-                      className="flex w-full cursor-pointer items-center justify-center gap-2 border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center text-sm font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center text-base font-medium text-[#111] transition hover:border-[#111] hover:bg-[#f5f5f5]"
                     >
                       <Camera className="h-4 w-4 text-[#777]" />
                       <span>Open camera for live full-body guidance</span>
@@ -707,10 +729,10 @@ export default function SizePage() {
               ) : (
                 <label className="mt-4 flex cursor-pointer flex-col items-center justify-center border border-dashed border-[#d7d7d7] bg-white px-4 py-8 text-center transition hover:border-[#111] hover:bg-[#f5f5f5]">
                   <ImagePlus className="h-6 w-6 text-[#777]" />
-                  <span className="mt-3 text-sm font-medium text-[#111]">
+                  <span className="mt-3 text-base font-medium text-[#111]">
                     Upload full-body image
                   </span>
-                  <span className="mt-2 text-xs text-[#777]">
+                  <span className="mt-2 text-sm text-[#666]">
                     PNG, JPG, WEBP, and more
                   </span>
                   <input
@@ -726,7 +748,7 @@ export default function SizePage() {
                 <div className="mt-4">
                   <label
                     htmlFor="height-cm"
-                    className="text-sm font-medium text-[#111]"
+                    className="text-base font-medium text-[#111]"
                   >
                     Your height in centimeters (optional)
                   </label>
@@ -739,7 +761,7 @@ export default function SizePage() {
                     value={heightCm}
                     onChange={(event) => setHeightCm(event.target.value)}
                     placeholder="e.g. 170"
-                    className="mt-2 w-full border border-[#d7d7d7] bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#111]"
+                    className="mt-2 w-full border border-[#d7d7d7] bg-white px-3 py-2.5 text-base text-[#111] outline-none focus:border-[#111]"
                   />
                   <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg">
                     Take the photo from about 2 metres away. Height is used only
@@ -753,20 +775,20 @@ export default function SizePage() {
               )}
 
               {file && (
-                <div className="mt-3 truncate text-xs uppercase tracking-[0.2em] text-[#666]">
+                <div className="mt-3 truncate text-sm text-[#555]">
                   {file.name}
                 </div>
               )}
 
               <div className="mt-5">
-                <div className="text-sm font-medium text-[#111]">Gender</div>
+                <div className="text-base font-medium text-[#111]">Gender</div>
                 <div className="mt-3 flex gap-3">
                   {["Women", "Men"].map((option) => (
                     <button
                       key={option}
                       type="button"
                       onClick={() => updateGender(option)}
-                      className={`rounded-none border px-4 py-2 text-xs tracking-[0.12em] transition-all ${
+                      className={`rounded-none border px-4 py-2 text-sm tracking-[0.08em] transition-all ${
                         gender === option
                           ? "bg-[#111] text-white border-[#111]"
                           : "bg-white text-[#555] border-[#ddd] hover:border-[#999] hover:text-[#111]"
@@ -785,14 +807,14 @@ export default function SizePage() {
                   loading ||
                   !file
                 }
-                className="mt-6 w-full rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-6 w-full rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "PROCESSING..." : "PREDICT SIZE"}
               </button>
 
               {message && (
                 <p
-                  className="mt-4 text-sm leading-6 text-[#666]"
+                  className="mt-4 text-base leading-7 text-[#555]"
                   style={SANS}
                 >
                   {message}
@@ -823,7 +845,7 @@ export default function SizePage() {
                   >
                     <div className="border border-[#ddd] bg-[#fafafa] px-5 py-6 text-center">
                       <div
-                        className="text-[10px] tracking-[0.25em] text-[#777]"
+                        className="text-sm tracking-[0.12em] text-[#555]"
                         style={SANS}
                       >
                         RECOMMENDED CLOTHING SIZE
@@ -836,24 +858,39 @@ export default function SizePage() {
                       </div>
                     </div>
                   {m.height_cm !== undefined && (
-                    <div
-                      className="border border-[#ddd] bg-[#fafafa] px-5 py-5 text-left text-xl leading-8 text-[#666] sm:text-lg"
-                      style={{ ...SANS, fontWeight: 400 }}
-                    >
-                      <p>
-                        {m.height_is_estimated ? "Approx. height" : "Height"}:{" "}
-                        {m.height_cm.toFixed(1)} cm ({m.height_m?.toFixed(2)} m)
-                      </p>
-                      <p>Shoulder width: {m.shoulder_cm?.toFixed(1)} cm</p>
-                      <p>Hip width: {m.hip_cm?.toFixed(1)} cm</p>
-                    </div>
-                  )}
+                      <div className="grid grid-cols-3 border-y border-[#ddd]">
+                        <div className="px-2 py-4 sm:px-4">
+                          <p className="text-xs tracking-[0.08em] text-[#777]" style={SANS}>
+                            SHOULDER WIDTH
+                          </p>
+                          <p className="mt-2 text-lg text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>
+                            {m.shoulder_cm?.toFixed(1) ?? "—"} <span className="text-xs text-[#777]">cm</span>
+                          </p>
+                        </div>
+                        <div className="border-l border-[#ddd] px-2 py-4 sm:px-4">
+                          <p className="text-xs tracking-[0.08em] text-[#777]" style={SANS}>
+                            HIP SIZE
+                          </p>
+                          <p className="mt-2 text-lg text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>
+                            {m.hip_cm?.toFixed(1) ?? "—"} <span className="text-xs text-[#777]">cm</span>
+                          </p>
+                        </div>
+                        <div className="border-l border-[#ddd] px-2 py-4 sm:px-4">
+                          <p className="text-xs tracking-[0.08em] text-[#777]" style={SANS}>
+                            {m.height_is_estimated ? "APPROX. HEIGHT" : "HEIGHT"}
+                          </p>
+                          <p className="mt-2 text-lg text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>
+                            {m.height_cm.toFixed(1)} <span className="text-xs text-[#777]">cm</span>
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <div
-                className="mt-6 border border-dashed border-[#d7d7d7] bg-[#fafafa] p-6 text-sm leading-7 text-[#666]"
+                className="mt-6 border border-dashed border-[#d7d7d7] bg-[#fafafa] p-6 text-base leading-7 text-[#555]"
                 style={SANS}
               >
                 Capture or upload a full-body photo to see your predicted size here.
@@ -916,7 +953,7 @@ export default function SizePage() {
           <div className="mt-8 flex justify-center">
             <Button
               onClick={() => router.push("/health-tips")}
-              className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-[11px] tracking-[0.2em] text-white transition-colors hover:bg-[#333]"
+              className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
               style={{ ...SANS, fontWeight: 400 }}
             >
               WELLNESS GUIDANCE

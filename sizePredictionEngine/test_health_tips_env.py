@@ -6,7 +6,7 @@ import health_tips
 
 
 class HealthTipsEnvTests(unittest.IsolatedAsyncioTestCase):
-    async def test_generate_health_tips_uses_only_clothing_size(self):
+    async def test_generate_health_tips_includes_available_measurements_safely(self):
         previous_model = os.environ.get("OLLAMA_MODEL")
         previous_base_url = os.environ.get("OLLAMA_BASE_URL")
         os.environ["OLLAMA_MODEL"] = "qwen2.5:3b"
@@ -17,15 +17,22 @@ class HealthTipsEnvTests(unittest.IsolatedAsyncioTestCase):
                 "health_tips._call_ollama",
                 return_value="Choose movement that feels comfortable and nourishing.",
             ) as call_ollama:
-                guidance = await health_tips.generate_health_tips(" M ")
+                guidance = await health_tips.generate_health_tips(
+                    " M ",
+                    height_cm=168,
+                    shoulder_cm=39,
+                    hip_cm=96,
+                )
 
             self.assertIn("comfortable", guidance.lower())
             prompt = call_ollama.call_args.args[0]
-            self.assertIn("predicted clothing size: M", prompt)
-            self.assertNotIn("shoulder width", prompt.lower())
-            self.assertNotIn("hip width", prompt.lower())
-            self.assertNotIn("height:", prompt.lower())
-            self.assertNotIn("gender:", prompt.lower())
+            self.assertIn('predicted clothing size is "M"', prompt)
+            self.assertIn('"height_cm": 168', prompt)
+            self.assertIn('"shoulder_cm": 39', prompt)
+            self.assertIn('"hip_cm": 96', prompt)
+            self.assertIn("cannot determine health", prompt)
+            self.assertIn("Do not recommend weight loss/gain", prompt)
+            self.assertNotIn('"gender":', prompt.lower())
         finally:
             if previous_model is None:
                 os.environ.pop("OLLAMA_MODEL", None)
