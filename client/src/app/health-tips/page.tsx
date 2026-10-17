@@ -14,7 +14,7 @@ function formatHealthTipsError(message: string): string {
   const normalized = message.trim();
 
   if (/ollama|qwen2\.5:3b/i.test(normalized)) {
-    return "The local Ollama guidance service is unavailable. Please start the qwen2.5:3b model in Ollama to generate your body appearance guide.";
+    return "The local Ollama guidance service is unavailable. Please start the qwen2.5:3b model in Ollama to generate your wellness guidance.";
   }
 
   return normalized || "Unable to generate body guidance.";
@@ -22,13 +22,15 @@ function formatHealthTipsError(message: string): string {
 
 export default function HealthTipsPage() {
   const router = useRouter();
-  const { bodyMeasurements } = useAppStore();
+  const { predictedSize, storageLoaded } = useAppStore();
   const [guidance, setGuidance] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!bodyMeasurements) {
+    if (!storageLoaded) return;
+
+    if (!predictedSize) {
       router.replace("/size");
       return;
     }
@@ -37,13 +39,7 @@ export default function HealthTipsPage() {
     setLoading(true);
     setError("");
 
-    fetchHealthTips({
-      shoulder_width: bodyMeasurements.shoulderCm,
-      hip_size: bodyMeasurements.hipCm,
-      height: bodyMeasurements.heightCm,
-      gender: bodyMeasurements.gender,
-      clothing_size: bodyMeasurements.clothingSize,
-    })
+    fetchHealthTips({ clothing_size: predictedSize })
       .then((result) => {
         if (!cancelled) setGuidance(result.guidance);
       })
@@ -61,19 +57,13 @@ export default function HealthTipsPage() {
     return () => {
       cancelled = true;
     };
-  }, [bodyMeasurements, router]);
+  }, [predictedSize, router, storageLoaded]);
 
   const retry = () => {
-    if (!bodyMeasurements) return;
+    if (!predictedSize) return;
     setLoading(true);
     setError("");
-    fetchHealthTips({
-      shoulder_width: bodyMeasurements.shoulderCm,
-      hip_size: bodyMeasurements.hipCm,
-      height: bodyMeasurements.heightCm,
-      gender: bodyMeasurements.gender,
-      clothing_size: bodyMeasurements.clothingSize,
-    })
+    fetchHealthTips({ clothing_size: predictedSize })
       .then((result) => setGuidance(result.guidance))
       .catch((requestError: unknown) => {
         const message =
@@ -108,28 +98,20 @@ export default function HealthTipsPage() {
           className="max-w-2xl"
         >
           <p className="text-[10px] tracking-[0.3em] text-[#999]" style={SANS}>
-            PERSONAL BODY GUIDANCE
+            PERSONAL WELLNESS GUIDANCE
           </p>
           <h1 className="mt-4 text-5xl leading-[0.95] text-[#111] md:text-7xl" style={{ ...SERIF, fontWeight: 300 }}>
-            Understand your proportions.
+            Everyday wellbeing, at your pace.
           </h1>
           <p className="mt-6 max-w-xl text-sm leading-7 text-[#777]" style={SANS}>
-            A considered guide to dressing, movement, and everyday wellbeing based on your measured proportions.
+            General, supportive wellness suggestions inspired by your predicted clothing size. A size label is not a measure of health.
           </p>
         </motion.header>
 
-        {bodyMeasurements && (
-          <div className="mt-12 grid border-y border-[#ddd] sm:grid-cols-3">
-            {[
-              ["SHOULDER WIDTH", bodyMeasurements.shoulderCm, "cm"],
-              ["HIP SIZE", bodyMeasurements.hipCm, "cm"],
-              ["HEIGHT", bodyMeasurements.heightCm, "cm"],
-            ].map(([label, value, unit]) => (
-              <div key={label} className="border-b border-[#ddd] px-1 py-5 last:border-0 sm:border-b-0 sm:border-r sm:px-6 sm:first:pl-0 sm:last:border-0">
-                <p className="text-[10px] tracking-[0.2em] text-[#999]" style={SANS}>{label}</p>
-                <p className="mt-2 text-2xl text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>{Number(value).toFixed(1)} <span className="text-sm text-[#888]">{unit}</span></p>
-              </div>
-            ))}
+        {predictedSize && (
+          <div className="mt-12 border-y border-[#ddd] px-1 py-5">
+            <p className="text-[10px] tracking-[0.2em] text-[#999]" style={SANS}>PREDICTED CLOTHING SIZE</p>
+            <p className="mt-2 text-2xl text-[#111]" style={{ ...SERIF, fontWeight: 400 }}>{predictedSize}</p>
           </div>
         )}
 

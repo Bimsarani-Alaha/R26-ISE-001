@@ -6,24 +6,26 @@ import health_tips
 
 
 class HealthTipsEnvTests(unittest.IsolatedAsyncioTestCase):
-    async def test_generate_health_tips_uses_ollama_model_for_body_appearance_guide(self):
+    async def test_generate_health_tips_uses_only_clothing_size(self):
         previous_model = os.environ.get("OLLAMA_MODEL")
         previous_base_url = os.environ.get("OLLAMA_BASE_URL")
         os.environ["OLLAMA_MODEL"] = "qwen2.5:3b"
         os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
 
         try:
-            with patch("health_tips._call_ollama", return_value="Your balanced silhouette suits structured tops and tailored fits."):
-                guidance = await health_tips.generate_health_tips(
-                    shoulder_width=42,
-                    hip_size=40,
-                    height=170,
-                    gender="woman",
-                    clothing_size="M",
-                )
+            with patch(
+                "health_tips._call_ollama",
+                return_value="Choose movement that feels comfortable and nourishing.",
+            ) as call_ollama:
+                guidance = await health_tips.generate_health_tips(" M ")
 
-            self.assertIn("structured tops", guidance.lower())
-            self.assertIn("balanced", guidance.lower())
+            self.assertIn("comfortable", guidance.lower())
+            prompt = call_ollama.call_args.args[0]
+            self.assertIn("predicted clothing size: M", prompt)
+            self.assertNotIn("shoulder width", prompt.lower())
+            self.assertNotIn("hip width", prompt.lower())
+            self.assertNotIn("height:", prompt.lower())
+            self.assertNotIn("gender:", prompt.lower())
         finally:
             if previous_model is None:
                 os.environ.pop("OLLAMA_MODEL", None)

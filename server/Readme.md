@@ -32,4 +32,4 @@ uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 http://localhost:8000/docs
 ```
 
-Done. Size prediction: /predict. Color/CVD/pattern: /coloranalyzer/...
+Done. Size prediction: `/predict` accepts a camera capture or uploaded image without height when using automatic prediction (the default). Color/CVD/pattern: `/coloranalyzer/...`.
