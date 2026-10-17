@@ -22,7 +22,7 @@ function formatHealthTipsError(message: string): string {
 
 export default function HealthTipsPage() {
   const router = useRouter();
-  const { bodyMeasurements, predictedSize, storageLoaded } = useAppStore();
+  const { bodyMeasurements, predictedSize, hydrated } = useAppStore();
   const healthTipsRequest = useMemo(
     () =>
       predictedSize
@@ -40,7 +40,7 @@ export default function HealthTipsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!storageLoaded) return;
+    if (!hydrated) return;
 
     if (!predictedSize || !healthTipsRequest) {
       router.replace("/size");
@@ -69,7 +69,7 @@ export default function HealthTipsPage() {
     return () => {
       cancelled = true;
     };
-  }, [healthTipsRequest, predictedSize, router, storageLoaded]);
+  }, [healthTipsRequest, hydrated, predictedSize, router]);
 
   const retry = () => {
     if (!healthTipsRequest) return;
