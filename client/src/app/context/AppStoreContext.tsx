@@ -14,6 +14,7 @@ import type { GetStylistResponse, ProductResult } from "@/app/lib/aiStyleApi";
 
 const GENDER_STORAGE_KEY = "styleai-gender";
 const BODY_MEASUREMENTS_STORAGE_KEY = "styleai-body-measurements";
+const PREDICTED_SIZE_STORAGE_KEY = "styleai-predicted-size";
 const REQUIREMENTS_STORAGE_KEY = "styleai-requirements";
 const OCCASION_STORAGE_KEY = "styleai-occasion";
 const SIZE_STORAGE_KEY = "styleai-size";
@@ -51,6 +52,7 @@ type AppStore = {
   productResults: ProductResult[];
   resultOccasionUsed: string[] | null;
   bodyMeasurements: BodyMeasurements | null;
+  predictedSize: string | null;
   colorPreference: string;
   stylistTipsCache: Record<string, GetStylistResponse>;
   hydrated: boolean;
@@ -63,6 +65,7 @@ type AppStore = {
   setProductResults: (v: ProductResult[]) => void;
   setResultOccasionUsed: (v: string[] | null) => void;
   setBodyMeasurements: (v: BodyMeasurements | null) => void;
+  setPredictedSize: (v: string | null) => void;
   setColorPreference: (v: string) => void;
   setStylistTipsCache: (v: Record<string, GetStylistResponse>) => void;
   setStylistTip: (productId: string, tip: GetStylistResponse | null) => void;
@@ -89,6 +92,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [productResults, setProductResults] = useState<ProductResult[]>([]);
   const [resultOccasionUsed, setResultOccasionUsed] = useState<string[] | null>(null);
   const [bodyMeasurements, setBodyMeasurementsState] = useState<BodyMeasurements | null>(null);
+  const [predictedSize, setPredictedSize] = useState<string | null>(null);
   const [stylistTipsCache, setStylistTipsCache] = useState<Record<string, GetStylistResponse>>({});
   const [hydrated, setHydrated] = useState(false);
 
@@ -96,6 +100,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setGenderState(readStorageValue<string>(GENDER_STORAGE_KEY, ""));
     setBodyMeasurementsState(readStorageValue<BodyMeasurements | null>(BODY_MEASUREMENTS_STORAGE_KEY, null));
+    setPredictedSize(readStorageValue<string | null>(PREDICTED_SIZE_STORAGE_KEY, null));
     setRequirements(readStorageValue<string>(REQUIREMENTS_STORAGE_KEY, ""));
     setOccasion(readStorageValue<string>(OCCASION_STORAGE_KEY, ""));
     setSize(readStorageValue<string>(SIZE_STORAGE_KEY, ""));
@@ -124,6 +129,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       );
     }
   }, [bodyMeasurements, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        PREDICTED_SIZE_STORAGE_KEY,
+        JSON.stringify(predictedSize),
+      );
+    }
+  }, [predictedSize, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -199,6 +214,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       productResults,
       resultOccasionUsed,
       bodyMeasurements,
+      predictedSize,
       colorPreference,
       stylistTipsCache,
       hydrated,
@@ -211,6 +227,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setProductResults,
       setResultOccasionUsed,
       setBodyMeasurements,
+      setPredictedSize,
       setColorPreference,
       setStylistTipsCache,
       setStylistTip,
@@ -225,6 +242,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       productResults,
       resultOccasionUsed,
       bodyMeasurements,
+      predictedSize,
       colorPreference,
       stylistTipsCache,
       hydrated,
