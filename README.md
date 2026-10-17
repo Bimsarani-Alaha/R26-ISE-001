@@ -63,6 +63,8 @@ npm run start
 
 ### Python Model Server
 
+The AI Style Recommendation backend has its own [setup and architecture guide](AI%20Style%20Recommendation%20Model/backend/README.md). The unified gateway keeps the existing `/fashion-recommendation/api/*` endpoints; standalone execution uses `python -m uvicorn style_recommendation.main:app` from its backend directory.
+
 From the `sizePredictionEngine` folder, install the dependencies and start the FastAPI server:
 
 ```bash

@@ -19,7 +19,7 @@ products within the same group; their original metadata order is preserved.
 
 ## FashionSigLIP local files and caching
 
-The supplied `app/fashionclip` folder contains Marqo FashionSigLIP. This integration
+The supplied `../artifacts/fashionclip` folder contains Marqo FashionSigLIP. This integration
 uses only these files:
 
 - `onnx/text_model.onnx`
@@ -47,7 +47,7 @@ directory are read. First-time searches take longer than cached searches.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `FASHIONCLIP_ENABLED` | `true` | Set `false` to return to Cartographer ranking. |
-| `FASHIONCLIP_MODEL_PATH` | `backend/app/fashionclip` | Local model directory. |
+| `FASHIONCLIP_MODEL_PATH` | `artifacts/fashionclip` | Local model directory. |
 | `FASHIONCLIP_CACHE_DIR` | `.cache/fashionclip` inside the AI Style project | Persisted image embeddings. |
 | `FASHIONCLIP_BATCH_SIZE` | `8` | Images encoded per batch. |
 | `FASHIONCLIP_THREADS` | `2` | ONNX CPU threads per encoder. |
@@ -62,7 +62,7 @@ From this backend directory:
 
 ```powershell
 python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+python -m uvicorn style_recommendation.main:app --reload
 ```
 
 ### Install dependencies into the interpreter that actually serves requests
@@ -89,7 +89,7 @@ downgraded to a warning, so a missing package never surfaces as an error respons
 `FashionSigLIP unavailable` and `Cartographer unavailable` in the log mean the
 feature is disabled for that process.
 
-The local `app/RankerModel` directory must contain the original `config.json`,
+The local `../artifacts/ranker` directory must contain the original `config.json`,
 `model.safetensors`, `tokenizer_config.json`, `tokenizer.json`, `vocab.txt`, and
 `special_tokens_map.json` from:
 https://huggingface.co/2013khansohail/cartographer-ecommerce-reranker-MiniLM-L6-v2
@@ -106,7 +106,7 @@ Set these environment variables before starting the backend:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RANKER_ENABLED` | `true` | Set `false` to use only existing rule-based ranking. |
-| `RANKER_MODEL_PATH` | `app/RankerModel` beside backend code | Local model directory; use an absolute path for overrides. |
+| `RANKER_MODEL_PATH` | `../artifacts/ranker` beside backend code | Local model directory; use an absolute path for overrides. |
 | `RANKER_BATCH_SIZE` | `16` | Number of pairs per inference batch. |
 | `RANKER_CANDIDATES_PER_GROUP` | `50` | Rule-ranked shortlist size per group, at least five. |
 

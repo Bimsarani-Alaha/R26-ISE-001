@@ -4,7 +4,11 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 import pandas as pd
-from app.config import DATASET_PATH, REQUIRED_COLUMNS, IMAGES_DIR
+from style_recommendation.core.config import load_settings, REQUIRED_COLUMNS
+
+_settings = load_settings()
+DATASET_PATH = _settings.dataset_path
+IMAGES_DIR = _settings.images_dir
 
 
 def validate_dataset():

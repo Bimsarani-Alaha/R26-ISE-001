@@ -1,11 +1,19 @@
+"""Print catalog diagnostics using the backend in this checkout."""
 import sys
-sys.path.insert(0, r"C:\Users\sashi\OneDrive\Desktop\Research V3\backend")
+from pathlib import Path
 
-from app.services.product_service import product_service
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from style_recommendation.repositories.catalog_repository import CatalogRepository
 
-df = product_service.load_dataset()
-print(f"Loaded {len(df)} products")
-print(f"Columns: {list(df.columns)}")
-print(f"Sample occasions: {df['occasion'].head(3).tolist()}")
-print(f"Gender values: {df['gender'].unique().tolist()}")
-print("Product service OK!")
+
+def main():
+    df = CatalogRepository().load_dataset()
+    print(f"Loaded {len(df)} products")
+    print(f"Columns: {list(df.columns)}")
+    print(f"Sample occasions: {df['occasion'].head(3).tolist()}")
+    print(f"Gender values: {df['gender'].unique().tolist()}")
+    print("Catalog repository OK!")
+
+
+if __name__ == "__main__":
+    main()

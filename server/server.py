@@ -70,18 +70,28 @@ from sizeAnalyzer import get_size_label
 STYLE_RECOMMENDATION_BACKEND = (
     base_dir / "AI Style Recommendation Model" / "backend"
 )
-if not STYLE_RECOMMENDATION_BACKEND.is_dir():
-    raise FileNotFoundError(
-        f"Style recommendation backend not found: {STYLE_RECOMMENDATION_BACKEND}"
-    )
-sys.path.insert(0, str(STYLE_RECOMMENDATION_BACKEND))
+try:
+    from style_recommendation.main import app as styleanalyzer_app
+except ModuleNotFoundError as exc:
+    if exc.name != "style_recommendation":
+        raise
+    # Preserve source-checkout startup when the backend is not installed yet.
+    if not STYLE_RECOMMENDATION_BACKEND.is_dir():
+        raise FileNotFoundError(
+            f"Style recommendation backend not found: {STYLE_RECOMMENDATION_BACKEND}"
+        ) from exc
+    sys.path.insert(0, str(STYLE_RECOMMENDATION_BACKEND))
+    from style_recommendation.main import app as styleanalyzer_app
 
-from app.main import app as styleanalyzer_app  # noqa: E402
+from style_recommendation.core.lifespan import mounted_style_lifespan
 
 
 app = FastAPI(
     title="Size Prediction API",
     description="Predict clothing size from a camera capture or uploaded photo without requiring height.",
+)
+app.router.lifespan_context = mounted_style_lifespan(
+    app.router.lifespan_context, styleanalyzer_app
 )
 
 app.add_middleware(
