@@ -94,6 +94,11 @@ app.mount("/coloranalyzer", coloranalyzer_app)
 app.mount("/styleanalyzer", styleanalyzer_app)
 app.mount("/cvdmatcher", cvdmatcher_app)
 
+DEFAULT_CAMERA_DISTANCE_M = 2.0
+ASSUMED_VERTICAL_FOV_DEGREES = 60.0
+EYE_TO_ANKLE_HEIGHT_RATIO = 0.93
+ESTIMATED_HEIGHT_CALIBRATION_OFFSET_CM = 23.3
+
 
 class HealthTipsRequest(BaseModel):
     clothing_size: str = Field(min_length=1, max_length=20)
@@ -312,7 +317,12 @@ def build_measurements(keypoints_array: np.ndarray, real_height: float, gender: 
     return measurements
 
 
-def build_automatic_predictions(keypoints_array: np.ndarray, gender: str) -> list[dict[str, str]]:
+def build_automatic_predictions(
+    keypoints_array: np.ndarray,
+    gender: str,
+    real_height: float | None = None,
+    frame_height: int | None = None,
+) -> list[dict[str, float | str | bool]]:
     measurements = extract_pixel_measurements(keypoints_array)
     if not measurements:
         return []
@@ -337,7 +347,49 @@ def build_automatic_predictions(keypoints_array: np.ndarray, gender: str) -> lis
         size_label = size_mapping.get(size_number)
         if size_label is None:
             raise ValueError(f"Linear size model returned an unknown size code: {size_number}")
-        predictions.append({"size": size_label}) #return the predicted size label for each detected person
+        prediction: dict[str, float | str | bool] = {
+            "size": size_label,
+            "height_px": measurement["height"],
+            "shoulder_width_px": measurement["shoulder_width"],
+            "hip_width_px": measurement["hip_width"],
+        }
+        if real_height is not None and measurement["height"] > 0:
+            cm_per_pixel = real_height / measurement["height"]
+            estimated_height_cm = real_height
+            height_is_estimated = False
+        elif frame_height and frame_height > 0 and measurement["height"] > 0:
+            frame_height_cm = (
+                2
+                * DEFAULT_CAMERA_DISTANCE_M
+                * 100
+                * np.tan(np.radians(ASSUMED_VERTICAL_FOV_DEGREES / 2))
+            )
+            cm_per_pixel = frame_height_cm / frame_height
+            estimated_height_cm = (
+                measurement["height"]
+                * cm_per_pixel
+                / EYE_TO_ANKLE_HEIGHT_RATIO
+            ) + ESTIMATED_HEIGHT_CALIBRATION_OFFSET_CM
+            cm_per_pixel = (
+                estimated_height_cm
+                * EYE_TO_ANKLE_HEIGHT_RATIO
+                / measurement["height"]
+            )
+            height_is_estimated = True
+        else:
+            predictions.append(prediction)
+            continue
+
+        prediction.update(
+            {
+                "height_cm": estimated_height_cm,
+                "height_m": estimated_height_cm / 100,
+                "height_is_estimated": height_is_estimated,
+                "shoulder_cm": measurement["shoulder_width"] * cm_per_pixel,
+                "hip_cm": measurement["hip_width"] * cm_per_pixel,
+            }
+        )
+        predictions.append(prediction)
 
     return predictions
 
@@ -524,6 +576,10 @@ async def predict(
         height is None or not np.isfinite(height) or height <= 0
     ):
         raise HTTPException(status_code=422, detail="A positive height is required for manual size prediction")
+    if mode == "automatic" and height is not None and (
+        not np.isfinite(height) or height <= 0
+    ):
+        raise HTTPException(status_code=422, detail="Height must be a positive number in centimeters")
 
     content = await file.read()
 
@@ -541,7 +597,12 @@ async def predict(
     if result.keypoints is not None: #if keypoints are detected, extract measurements
         keypoints = result.keypoints.xy.cpu().numpy()
         if mode == "automatic":
-            measurements = build_automatic_predictions(keypoints, gender)
+            measurements = build_automatic_predictions(
+                keypoints,
+                gender,
+                height,
+                frame_height=image.shape[0],
+            )
         else:
             measurements = build_measurements(keypoints, height, gender)
 

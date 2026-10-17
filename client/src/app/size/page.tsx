@@ -12,6 +12,9 @@ type Measurement = {
   shoulder_width?: number;
   hip_width?: number;
   height?: number;
+  height_cm?: number;
+  height_m?: number;
+  height_is_estimated?: boolean;
   shoulder_cm?: number;
   hip_cm?: number;
   size?: string;
@@ -47,6 +50,7 @@ export default function SizePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [gender, setGenderState] = useState(savedGender || "Women");
+  const [heightCm, setHeightCm] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [poseReady, setPoseReady] = useState(false);
@@ -312,6 +316,7 @@ export default function SizePage() {
     setMode(nextMode);
     setFile(null);
     setPreview("");
+    setHeightCm("");
     setResultImage("");
     setMeasurements([]);
     setMessage("");
@@ -375,10 +380,23 @@ export default function SizePage() {
       return;
     }
 
+    const parsedHeight = heightCm.trim() ? Number(heightCm) : null;
+    if (
+      mode === "upload" &&
+      parsedHeight !== null &&
+      (!Number.isFinite(parsedHeight) || parsedHeight <= 0)
+    ) {
+      setMessage("Enter a valid height in centimeters, or leave it blank.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", imageFile);
     formData.append("mode", "automatic");
     formData.append("gender", gender);
+    if (mode === "upload" && parsedHeight !== null) {
+      formData.append("height", String(parsedHeight));
+    }
 
     setLoading(true);
     setMessage("");
@@ -425,7 +443,7 @@ export default function SizePage() {
 
   return (
     <div className="min-h-screen w-full bg-white text-[#111]">
-      <nav className="flex items-center justify-between border-b border-[#e8e8e8] px-8 py-6 md:px-16">
+      <nav className="flex items-center justify-between border-b border-[#e8e8e8] px-4 py-4 sm:px-8 sm:py-6 md:px-16">
         <div className="flex items-center gap-8">
           {[
             { label: "HOME", href: "/" },
@@ -462,7 +480,7 @@ export default function SizePage() {
             onClick={() => router.push("/size")}
             variant="outline"
             size="sm"
-            className="h-auto rounded-none border-[#111] px-4 py-1.5 text-xs tracking-[0.15em] text-[#111] transition-colors hover:bg-[#111] hover:text-white"
+            className="h-auto rounded-none border-[#111] px-2.5 py-1.5 text-[10px] tracking-[0.1em] text-[#111] transition-colors hover:bg-[#111] hover:text-white sm:px-4 sm:text-xs sm:tracking-[0.15em]"
             style={{ ...SANS, fontWeight: 400 }}
           >
             FIND YOUR SIZE
@@ -470,7 +488,7 @@ export default function SizePage() {
         </div>
       </nav>
 
-      <main className="px-8 py-10 md:px-16 md:py-16">
+      <main className="px-4 py-6 sm:px-8 sm:py-10 md:px-16 md:py-16">
         <div className="grid gap-6 lg:grid-cols-2">
           <motion.section
             initial={{ opacity: 0, y: 18 }}
@@ -498,7 +516,7 @@ export default function SizePage() {
                     className="mt-4 max-w-lg text-sm leading-7 text-white/80 sm:text-base"
                     style={SANS}
                   >
-                    Choose the camera or upload a full-body photo to get a size recommendation. Neither option requires your height.
+                    Choose the camera or upload a full-body photo for a pixel-based size recommendation. Height is optional for centimeter measurements on uploads.
                   </p>
                   <div className="mt-8 flex flex-wrap gap-3">
                     <Button
@@ -532,7 +550,7 @@ export default function SizePage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
-            className="border border-[#e8e8e8] bg-[#fafafa] p-8 sm:p-10 lg:p-12"
+            className="border border-[#e8e8e8] bg-[#fafafa] p-4 sm:p-10 lg:p-12"
           >
             <h2
               className="text-2xl tracking-[0.2em] text-[#111]"
@@ -548,7 +566,7 @@ export default function SizePage() {
                 },
                 {
                   title: "UPLOAD A PHOTO",
-                  desc: "Upload a clear full-body photo. The same height-free size analyzer estimates your clothing size.",
+                  desc: "Upload a clear full-body photo from about 2 metres away. Height is optional for centimeter measurements; size prediction uses pixel measurements.",
                 },
                 {
                   title: "RESULT",
@@ -578,7 +596,7 @@ export default function SizePage() {
 
           <div
             id="size-analysis"
-            className="border border-[#e8e8e8] bg-white p-8 sm:p-10 lg:p-12"
+            className="border border-[#e8e8e8] bg-white p-4 sm:p-10 lg:p-12"
           >
             <div
               className="mb-4 flex items-center gap-2 text-[11px] tracking-[0.25em] text-[#777]"
@@ -587,7 +605,7 @@ export default function SizePage() {
               START YOUR ANALYSIS
             </div>
 
-            <div className="border border-[#e5e5e5] bg-[#fafafa] p-6 sm:p-7">
+            <div className="border border-[#e5e5e5] bg-[#fafafa] p-3 sm:p-7">
               <div className="grid gap-3 sm:grid-cols-2">
                 {([
                   ["camera", "Use camera", "Live full-body guidance"],
@@ -618,8 +636,7 @@ export default function SizePage() {
               {mode === "camera" ? (
                 <div className="mt-4">
                   <p
-                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-3 py-2 text-sm leading-6 text-[#555]"
-                    style={SANS}
+                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg"
                   >
                     Please move back until you are approximately{" "}
                     <strong className="font-semibold text-[#111]">
@@ -630,8 +647,8 @@ export default function SizePage() {
                     camera cannot verify the exact distance.
                   </p>
                   {cameraOpen ? (
-                    <div className="border border-dashed border-[#d7d7d7] bg-white p-3">
-                      <div className="relative mx-auto aspect-video w-full overflow-hidden bg-black">
+                    <div className="border border-dashed border-[#d7d7d7] bg-white p-2 sm:p-3">
+                      <div className="relative mx-auto h-[min(70svh,560px)] min-h-[360px] w-full overflow-hidden bg-black sm:aspect-video sm:h-auto sm:min-h-0">
                         <video
                           ref={videoRef}
                           autoPlay
@@ -651,9 +668,8 @@ export default function SizePage() {
                         className={`mt-3 border px-3 py-2 text-sm leading-6 ${
                           poseReady
                             ? "border-[#d4e8d5] bg-[#f0f8f0] text-[#225b2a]"
-                            : "border-[#f0e3a2] bg-[#fff9df] text-[#555]"
-                        }`}
-                        style={SANS}
+                            : "border-[#f0e3a2] bg-[#fff9df] text-[#666]"
+                        } font-sans`}
                       >
                         {poseStatus}
                       </p>
@@ -704,6 +720,36 @@ export default function SizePage() {
                     className="hidden"
                   />
                 </label>
+              )}
+
+              {mode === "upload" && (
+                <div className="mt-4">
+                  <label
+                    htmlFor="height-cm"
+                    className="text-sm font-medium text-[#111]"
+                  >
+                    Your height in centimeters (optional)
+                  </label>
+                  <input
+                    id="height-cm"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={heightCm}
+                    onChange={(event) => setHeightCm(event.target.value)}
+                    placeholder="e.g. 170"
+                    className="mt-2 w-full border border-[#d7d7d7] bg-white px-3 py-2 text-sm text-[#111] outline-none focus:border-[#111]"
+                  />
+                  <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg">
+                    Take the photo from about 2 metres away. Height is used only
+                    to scale the pixel measurements into centimeters; it does
+                    not change the pixel-based size prediction. If left blank,
+                    the app estimates height assuming a 2-metre distance and a
+                    typical 60-degree camera field of view; actual results may
+                    vary by camera and framing.
+                  </p>
+                </div>
               )}
 
               {file && (
@@ -773,20 +819,35 @@ export default function SizePage() {
                 {measurements.map((m, i) => (
                   <div
                     key={`${m.size ?? "size"}-${i}`}
-                    className="border border-[#ddd] bg-[#fafafa] px-5 py-6 text-center"
+                    className="space-y-3"
                   >
-                    <div
-                      className="text-[10px] tracking-[0.25em] text-[#777]"
-                      style={SANS}
-                    >
-                      RECOMMENDED CLOTHING SIZE
+                    <div className="border border-[#ddd] bg-[#fafafa] px-5 py-6 text-center">
+                      <div
+                        className="text-[10px] tracking-[0.25em] text-[#777]"
+                        style={SANS}
+                      >
+                        RECOMMENDED CLOTHING SIZE
+                      </div>
+                      <div
+                        className="mt-2 text-4xl text-[#111]"
+                        style={{ ...SERIF, fontWeight: 500 }}
+                      >
+                        {m.size ?? "N/A"}
+                      </div>
                     </div>
+                  {m.height_cm !== undefined && (
                     <div
-                      className="mt-2 text-4xl text-[#111]"
-                      style={{ ...SERIF, fontWeight: 500 }}
+                      className="border border-[#ddd] bg-[#fafafa] px-5 py-5 text-left text-xl leading-8 text-[#666] sm:text-lg"
+                      style={{ ...SANS, fontWeight: 400 }}
                     >
-                      {m.size ?? "N/A"}
+                      <p>
+                        {m.height_is_estimated ? "Approx. height" : "Height"}:{" "}
+                        {m.height_cm.toFixed(1)} cm ({m.height_m?.toFixed(2)} m)
+                      </p>
+                      <p>Shoulder width: {m.shoulder_cm?.toFixed(1)} cm</p>
+                      <p>Hip width: {m.hip_cm?.toFixed(1)} cm</p>
                     </div>
+                  )}
                   </div>
                 ))}
               </div>
