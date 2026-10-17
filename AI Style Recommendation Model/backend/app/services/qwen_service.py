@@ -27,10 +27,23 @@ class QwenService:
             "prompt": prompt,
             "stream": False,
         }
-        if model == QWEN_STYLIST_MODEL:
-            # Qwen3's installed thinking variant can return an empty response
-            # with format=json. The stylist prompt already requires JSON.
+        is_stylist = model == QWEN_STYLIST_MODEL
+        endpoint = "generate"
+        answer_prefix = "{"
+        if is_stylist:
+            # This Qwen3-VL thinking variant ignores think=False on generate.
+            # A nonempty assistant prefill makes its chat renderer close the
+            # thinking block and its parser collect answer content directly.
+            endpoint = "chat"
+            payload.pop("prompt")
+            payload["messages"] = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": answer_prefix},
+            ]
             payload["think"] = False
+            payload["options"] = {"num_predict": 768, "temperature": 0.2}
+            # JSON grammar starts at a fresh object, so do not combine it with
+            # a prefilled opening brace. The prompt specifies the JSON schema.
         else:
             payload["format"] = "json"
         if images:
@@ -41,17 +54,28 @@ class QwenService:
                     with open(path, "rb") as f:
                         encoded_images.append(base64.b64encode(f.read()).decode("utf-8"))
             if encoded_images:
-                payload["images"] = encoded_images
+                if is_stylist:
+                    payload["messages"][0]["images"] = encoded_images
+                else:
+                    payload["images"] = encoded_images
 
         headers = {"ngrok-skip-browser-warning": "true"}
         # Image encoding and reasoning take longer than text extraction locally.
         timeout = QWEN_STYLIST_TIMEOUT if model == QWEN_STYLIST_MODEL else 180.0
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                logger.info(f"Calling Ollama model {model} at {OLLAMA_BASE_URL}/api/generate (timeout={timeout}s)")
-                response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, headers=headers)
+                logger.info(f"Calling Ollama model {model} at {OLLAMA_BASE_URL}/api/{endpoint} (timeout={timeout}s)")
+                response = await client.post(f"{OLLAMA_BASE_URL}/api/{endpoint}", json=payload, headers=headers)
                 response.raise_for_status()
                 result = response.json()
+                if is_stylist:
+                    if result.get("done_reason") == "length":
+                        return json.dumps({"error": "Styling generation reached its token limit before finishing. Please try again with a shorter request."})
+                    content = result.get("message", {}).get("content", "")
+                    if not content.strip():
+                        return json.dumps({"error": "The styling model returned no answer. Check the Ollama model logs."})
+                    # Ollama returns only the continuation, excluding the prefix.
+                    return answer_prefix + content
                 return result.get("response", "")
         except httpx.HTTPStatusError as e:
             detail = e.response.text[:2000]

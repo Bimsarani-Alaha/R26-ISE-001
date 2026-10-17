@@ -1,7 +1,6 @@
 import pandas as pd
-import re
 from ..schemas.models import RequirementResponse, ProductResult
-from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION, TOP_K
+from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION
 from ..services.recommendation_service import recommendation_service
 from ..services.product_service import product_service
 from ..services.cartographer_service import cartographer_service
@@ -29,6 +28,7 @@ class RankingService:
         selected_size: str,
         query: str = "",
     ) -> tuple[list[ProductResult], list[ProductResult]]:
+        candidates = recommendation_service.filter_required_attributes(candidates, requirements)
         has_occasion = bool(requirements.occasion)
         weights = WEIGHTS_WITH_OCCASION if has_occasion else WEIGHTS_WITHOUT_OCCASION
 
@@ -37,20 +37,15 @@ class RankingService:
             score_breakdown = {}
             total_score = 0.0
 
-            at_score = recommendation_service.match_field(
-                str(row.get("article_type", "")),
-                requirements.article_types,
-                "article_type",
-            )
+            at_score = float(recommendation_service.matches_article_type(
+                row.get("article_type"), requirements.article_types,
+            ))
 
             score_breakdown["article_type"] = at_score
             total_score += at_score * weights.get("article_type", 0)
 
-            colour_score = recommendation_service.match_field(
-                str(row.get("base_colour", "")),
-                requirements.preferred_colors,
-                "base_colour",
-            )
+            colour_match = recommendation_service.colour_match(row.get("base_colour"), requirements.preferred_colors)
+            colour_score = {"exact": 1.0, "shade": 0.8}.get(colour_match, 0.0)
             score_breakdown["base_colour"] = colour_score
             total_score += colour_score * weights.get("base_colour", 0)
 
@@ -112,6 +107,7 @@ class RankingService:
 
             mismatches, unverified = self._requirement_evidence(row, requirements)
             product_result = ProductResult(
+                colour_match=colour_match,
                 unmatched_requirements=mismatches,
                 unverified_requirements=unverified,
                 product_id=str(row["product_id"]),
@@ -141,7 +137,10 @@ class RankingService:
                 product_result.explanation = " ".join(parts)
             scored.append(product_result)
 
-        scored.sort(key=lambda x: x.match_score, reverse=True)
+        def colour_priority(product):
+            return {"exact": 2, "shade": 1}.get(product.colour_match, 0)
+
+        scored.sort(key=lambda p: (colour_priority(p), p.match_score), reverse=True)
         exact = [p for p in scored if p.match_category == "exact"]
         alternatives = [p for p in scored if p.match_category == "alternative" and p.match_score > 0]
         if query.strip():
@@ -155,31 +154,31 @@ class RankingService:
                 def visual_key(product):
                     return (product.visual_score is not None,
                             product.visual_score if product.visual_score is not None else 0.0)
-                exact = sorted(exact[:RANKER_CANDIDATES_PER_GROUP], key=visual_key, reverse=True)
-                alternatives = sorted(alternatives[:RANKER_CANDIDATES_PER_GROUP], key=visual_key, reverse=True)
-                return exact[:TOP_K], alternatives[:TOP_K]
+                exact.sort(key=lambda p: (colour_priority(p), *visual_key(p)), reverse=True)
+                alternatives.sort(key=visual_key, reverse=True)
+                return exact, alternatives
             relevance = cartographer_service.score(query, shortlist)
             if relevance is not None:
                 for product, score in zip(shortlist, relevance):
                     product.reranker_score = score
-                exact = sorted(exact[:RANKER_CANDIDATES_PER_GROUP],
-                               key=lambda p: p.reranker_score, reverse=True)
-                alternatives = sorted(alternatives[:RANKER_CANDIDATES_PER_GROUP],
-                                      key=lambda p: p.reranker_score, reverse=True)
-        return exact[:TOP_K], alternatives[:TOP_K]
+                def relevance_key(product):
+                    return (product.reranker_score is not None,
+                            product.reranker_score if product.reranker_score is not None else 0.0)
+                exact.sort(key=lambda p: (colour_priority(p), *relevance_key(p)), reverse=True)
+                alternatives.sort(key=relevance_key, reverse=True)
+        # Keep every eligible result so colours and occasion groups are not lost
+        # behind a global top-five limit. AI inference remains bounded above.
+        return exact, alternatives
 
     @staticmethod
     def _normalize(value: str, field: str) -> str:
         value = str(value).strip().casefold()
+        if field == "clothing type":
+            return recommendation_service.normalize_article_type(value)
         if field == "occasion":
             value = product_service.normalize_occasion(value).casefold()
         aliases = {
             "colour": {"gray": "grey"},
-            "clothing type": {
-                "pants": "trousers", "trouser": "trousers",
-                "tee": "t-shirt", "teeshirt": "t-shirt", "tshirt": "t-shirt",
-                "sari": "saree", "frock": "dress", "frock dress": "dress",
-            },
         }
         return aliases.get(field, {}).get(value, value)
 
@@ -205,10 +204,14 @@ class RankingService:
             if not requested:
                 continue
             value = row.get(column)
+            if field == "clothing type" and recommendation_service.matches_article_type(value, requested):
+                continue
+            if field == "colour" and recommendation_service.colour_match(value, requested) in {"exact", "shade"}:
+                continue
             # Only occasion is a multi-value source field. Keep compound
             # material/garment labels intact rather than treating them as options.
             actual = [] if pd.isna(value) else (
-                re.split(r"[,/;]", str(value)) if field == "occasion" else [str(value)]
+                list(recommendation_service.occasion_values(value)) if field == "occasion" else [str(value)]
             )
             normalized = {self._normalize(v, field) for v in actual}
             normalized -= {"", "unknown", "n/a", "na", "none", "null", "nan"}

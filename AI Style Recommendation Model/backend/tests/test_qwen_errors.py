@@ -54,6 +54,8 @@ def test_requirements_and_styling_use_separate_models(monkeypatch, tmp_path, wit
     def respond(request):
         data = json.loads(request.content)
         calls.append(data)
+        if request.url.path == "/api/chat":
+            return httpx.Response(200, json={"message": {"content": '"summary":"Wedding outfit"}'}, "done_reason": "stop"})
         return httpx.Response(200, json={"response": '{"summary":"Wedding outfit"}'})
 
     client_class = httpx.AsyncClient
@@ -67,11 +69,11 @@ def test_requirements_and_styling_use_separate_models(monkeypatch, tmp_path, wit
     assert calls[0]["model"] == "qwen2.5:7b"
     assert "images" not in calls[0]
     assert calls[1]["model"] == "qwen3-vl:8b"
-    # This installed thinking model can put JSON-constrained output entirely
-    # in the thinking field. Let the prompt specify JSON for vision requests.
     assert "format" not in calls[1]
-    assert bool(calls[1].get("images")) is with_image
-    assert "Yellow" in calls[1]["prompt"]
+    assert calls[1]["messages"][-1] == {"role": "assistant", "content": "{"}
+    assert 0 < calls[1]["options"]["num_predict"] <= 1024
+    assert bool(calls[1]["messages"][0].get("images")) is with_image
+    assert "Yellow" in calls[1]["messages"][0]["content"]
     assert result["summary"] == "Wedding outfit"
 
 
@@ -88,3 +90,18 @@ def test_connection_requires_both_models(monkeypatch, installed, expected):
     monkeypatch.setattr(service.httpx, "AsyncClient", lambda **kwargs: client_class(
         transport=transport, **kwargs))
     assert asyncio.run(service.QwenService().check_connection()) is expected
+
+
+@pytest.mark.parametrize("body,expected", [
+    ({"message": {"content": '"summary":'}, "done_reason": "length"}, "token limit"),
+    ({"message": {"content": "", "thinking": "Still reasoning"}, "done_reason": "stop"}, "no answer"),
+])
+def test_stylist_reports_incomplete_generation(monkeypatch, body, expected):
+    service = importlib.import_module("app.services.qwen_service")
+    client_class = httpx.AsyncClient
+    monkeypatch.setattr(service.httpx, "AsyncClient", lambda **kwargs: client_class(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=body)), **kwargs))
+    result = asyncio.run(service.QwenService().generate_styling_tips(
+        {"article_type": "Dress", "base_colour": "White"}, "White dress for a party"))
+    assert expected in result["error"].lower()
+    assert "raw" not in result

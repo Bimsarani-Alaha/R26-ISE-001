@@ -11,6 +11,7 @@ export interface HealthResponse {
 
 export interface ProductResult {
   match_category?: "exact" | "alternative";
+  colour_match?: "exact" | "shade" | "different" | "unknown" | "unspecified";
   unmatched_requirements?: string[];
   unverified_requirements?: string[];
   product_id: string;

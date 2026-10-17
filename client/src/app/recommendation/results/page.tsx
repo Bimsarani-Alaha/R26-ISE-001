@@ -10,6 +10,7 @@ import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Card } from "@/app/components/ui/card";
 import { useAppStore } from "@/app/context/AppStoreContext";
+import { buildRecommendationGroups } from "@/app/lib/recommendationGroups";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
@@ -17,19 +18,13 @@ const API_BASE_URL =
 
 export default function RecommendationResultsPage() {
   const router = useRouter();
-  const { productResults, requirements, gender, size, hydrated } =
+  const { productResults, resultOccasionUsed, requirements, gender, size, hydrated } =
     useAppStore();
   const [liked, setLiked] = useState<string[]>([]);
   const matchingProducts = productResults.filter(
     (item) => item.match_category === "exact",
   );
-  const alternatives = productResults.filter(
-    (item) => item.match_category !== "exact",
-  );
-  const groups = [
-    { title: "Matching your request", items: matchingProducts },
-    { title: "Similar alternatives", items: alternatives },
-  ];
+  const groups = buildRecommendationGroups(productResults, resultOccasionUsed);
 
   const toggleLike = (id: string) => {
     setLiked((prev) =>
@@ -54,7 +49,7 @@ export default function RecommendationResultsPage() {
     );
   }
 
-  if (productResults.length === 0) {
+  if (matchingProducts.length === 0) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -130,14 +125,13 @@ export default function RecommendationResultsPage() {
 
           <p className="text-[10px] tracking-[0.2em] text-[#bbb]" style={SANS}>
             {gender.toUpperCase()} · SIZE {size.toUpperCase()} ·{" "}
-            {productResults.length} RESULTS
+            {matchingProducts.length} RESULTS
           </p>
         </motion.div>
 
-        {matchingProducts.length === 0 && (
-          <p role="status" className="text-sm text-[#555] mb-8" style={SANS}>
-            No products match all your requirements. Any available alternatives
-            are shown below.
+        {!resultOccasionUsed?.length && (
+          <p className="text-sm text-[#555] mb-8" style={SANS}>
+            No occasion specified. Matches are grouped by their catalogue occasions.
           </p>
         )}
         {groups.map(
@@ -154,7 +148,7 @@ export default function RecommendationResultsPage() {
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{
-                        delay: 0.1 + i * 0.08,
+                        delay: 0.1 + Math.min(i, 7) * 0.08,
                       }}
                     >
                       <Card
@@ -166,6 +160,7 @@ export default function RecommendationResultsPage() {
                         {/* IMAGE */}
                         <div className="relative overflow-hidden aspect-[3/4] bg-[#f5f5f5] mb-4">
                           <img
+                            loading="lazy"
                             src={getImageUrl(item.image_path)}
                             alt={item.article_type}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -216,6 +211,11 @@ export default function RecommendationResultsPage() {
 
                         {/* INFO */}
                         <div>
+                          {item.colour_match === "shade" && (
+                            <p className="text-xs text-[#666] mb-2" style={SANS}>
+                              Related colour shade
+                            </p>
+                          )}
                           {item.match_category !== "exact" && (
                             <p
                               className="text-xs text-[#666] mb-2"

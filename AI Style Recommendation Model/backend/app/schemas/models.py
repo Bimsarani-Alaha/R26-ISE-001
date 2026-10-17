@@ -27,6 +27,7 @@ class RecommendationRequest(BaseModel):
 
 class ProductResult(BaseModel):
     match_category: Literal["exact", "alternative"] = "exact"
+    colour_match: Literal["exact", "shade", "different", "unknown", "unspecified"] = "unspecified"
     unmatched_requirements: list[str] = Field(default_factory=list)
     unverified_requirements: list[str] = Field(default_factory=list)
     product_id: str

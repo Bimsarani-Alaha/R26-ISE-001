@@ -32,7 +32,7 @@ const FASHION_TIPS = [
 
 export default function RecommendationLoadingPage() {
   const router = useRouter();
-  const { requirements, gender, size, setProductResults } = useAppStore();
+  const { requirements, gender, size, setProductResults, setResultOccasionUsed } = useAppStore();
   const [stepIndex, setStepIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
@@ -112,10 +112,8 @@ export default function RecommendationLoadingPage() {
 
         if (cancelled) return;
 
-        setProductResults([
-          ...result.recommendations,
-          ...(result.alternatives ?? []),
-        ]);
+        setProductResults(result.recommendations);
+        setResultOccasionUsed(result.occasion_used ?? null);
         setStepIndex(PROCESSING_STEPS.length - 1);
         setProgress(100);
 
@@ -142,7 +140,7 @@ export default function RecommendationLoadingPage() {
       clearInterval(progressTimer);
       clearInterval(tipTimer);
     };
-  }, [router, requirements, gender, size, setProductResults, attempt]);
+  }, [router, requirements, gender, size, setProductResults, setResultOccasionUsed, attempt]);
 
   const handleRetry = () => {
     setError("");

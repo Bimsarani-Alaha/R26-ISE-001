@@ -26,5 +26,6 @@ def test_real_catalog_red_office_shirt_is_an_exact_match():
     candidates = recommendation_service.generate_candidates(df, "Male", "M", req)
     exact, alternatives = ranking_service.calculate_groups(candidates, req, "M")
     assert "P313" in {p.product_id for p in exact}
-    assert all(p.base_colour == "Red" and p.article_type == "Shirt" for p in exact)
+    assert all(p.colour_match in {"exact", "shade"} and p.article_type == "Shirt" for p in exact)
+    assert exact[0].base_colour == "Red"
     assert "P313" not in {p.product_id for p in alternatives}

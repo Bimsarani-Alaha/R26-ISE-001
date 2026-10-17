@@ -46,6 +46,7 @@ def _export_results_to_json(
             "recommendations": [
                 {
                     "match_category": r.match_category,
+                    "colour_match": r.colour_match,
                     "unmatched_requirements": r.unmatched_requirements,
                     "unverified_requirements": r.unverified_requirements,
                     "product_id": r.product_id,
@@ -115,7 +116,7 @@ async def get_recommendations(request: RecommendationRequest):
         elif isinstance(occasion, str):
             occasion = [occasion] if occasion.strip() else None
         elif isinstance(occasion, list):
-            occasion = [o for o in occasion if o.strip()] if occasion else None
+            occasion = [o.strip() for o in occasion if o.strip()] or None
 
         req_model = RequirementResponse(
             occasion=occasion,
@@ -152,7 +153,7 @@ async def get_recommendations(request: RecommendationRequest):
                 recommendations=[],
                 occasion_used=occasion,
                 total_candidates=0,
-                message="No products match your gender, size and budget.",
+                message="No products match your requested clothing type, occasion, gender, size and budget.",
             )
 
         with progress.stage("Scoring & ranking"):

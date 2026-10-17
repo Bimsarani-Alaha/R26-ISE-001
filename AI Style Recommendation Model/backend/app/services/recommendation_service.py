@@ -1,6 +1,28 @@
 import pandas as pd
+import re
 from typing import Optional
 from ..schemas.models import RequirementResponse
+from .product_service import product_service
+
+UNKNOWN_VALUES = {"", "unknown", "n/a", "na", "none", "null", "nan"}
+ARTICLE_FAMILIES = {
+    "lehenga": {"lehenga", "lehenga choli", "lehenga choli set", "lehenga set",
+                "lehenga skirt", "lehenga skirt set"},
+}
+COLOUR_SHADES = {
+    "blue": {"light blue", "dark blue", "navy blue", "sky blue", "royal blue",
+             "powder blue", "dusty blue", "ice blue", "steel blue", "teal blue", "turquoise blue"},
+    "red": {"dark red", "light red", "maroon", "burgundy", "burgundy maroon", "dark red maroon", "coral red"},
+    "green": {"light green", "dark green", "olive green", "sage green", "mint green",
+              "bottle green", "pista green", "sea green", "lime green", "teal green"},
+    "pink": {"light pink", "dark pink", "hot pink", "blush pink", "dusty pink", "rose pink", "dusty rose pink"},
+    "yellow": {"light yellow", "pale yellow", "mustard yellow", "bright yellow"},
+    "purple": {"light purple", "dark purple", "lavender", "purple plum"},
+    "grey": {"light grey", "dark grey", "charcoal grey", "dark charcoal", "silver grey"},
+    "brown": {"light brown", "dark brown", "rust brown"},
+    "white": {"off white", "ivory"},
+    "orange": {"light orange", "dark orange", "rust orange"},
+}
 
 ARTICLE_SYNONYMS = {
     "pants": ["trousers", "trouser"],
@@ -36,6 +58,73 @@ SIZE_ALIASES = {
 class RecommendationService:
     def __init__(self):
         pass
+
+    @staticmethod
+    def normalize_article_type(value) -> str:
+        value = str(value).strip().casefold()
+        return {
+            "pants": "trousers", "trouser": "trousers",
+            "tee": "t-shirt", "teeshirt": "t-shirt", "tshirt": "t-shirt",
+            "sari": "saree", "frock": "dress", "frock dress": "dress",
+        }.get(value, value)
+
+    def matches_article_type(self, value, requested: list[str]) -> bool:
+        actual = self.normalize_article_type(value)
+        if actual in UNKNOWN_VALUES:
+            return False
+        # General requests include known catalogue variants. Specific requests
+        # remain specific; do not use substring matching across garment types.
+        return any(
+            actual in ARTICLE_FAMILIES.get(wanted, {wanted})
+            for wanted in (self.normalize_article_type(v) for v in requested)
+            if wanted not in UNKNOWN_VALUES
+        )
+
+    @staticmethod
+    def normalize_colour(value) -> str:
+        value = re.sub(r"\s+", " ", str(value).strip().casefold().replace("-", " "))
+        value = re.sub(r"\bgray\b", "grey", value)
+        return {"navy": "navy blue", "charcoal": "charcoal grey",
+                "mustard": "mustard yellow", "olive": "olive green"}.get(value, value)
+
+    def colour_match(self, value, requested: list[str]) -> str:
+        if not requested:
+            return "unspecified"
+        actual = self.normalize_colour(value)
+        if actual in UNKNOWN_VALUES:
+            return "unknown"
+        wanted = {self.normalize_colour(v) for v in requested} - UNKNOWN_VALUES
+        if actual in wanted:
+            return "exact"
+        # Only broaden a base colour to its known shades. Compound/multicolour
+        # labels are not accepted just because they contain the requested word.
+        if any(actual in COLOUR_SHADES.get(v, set()) for v in wanted):
+            return "shade"
+        return "different"
+
+    @staticmethod
+    def occasion_values(value) -> set[str]:
+        if str(value).strip().casefold() in UNKNOWN_VALUES:
+            return set()
+        return {
+            product_service.normalize_occasion(part).casefold()
+            for part in re.split(r"[,/;]|\band\b|&", str(value), flags=re.IGNORECASE)
+            if part.strip().casefold() not in UNKNOWN_VALUES
+        }
+
+    def filter_required_attributes(self, df: pd.DataFrame, requirements: RequirementResponse) -> pd.DataFrame:
+        if df.empty:
+            return df
+        if requirements.article_types:
+            mask = df["article_type"].map(
+                lambda v: self.matches_article_type(v, requirements.article_types)
+            ).astype(bool)
+            df = df.loc[mask]
+        if requirements.occasion:
+            wanted = set().union(*(self.occasion_values(v) for v in requirements.occasion))
+            mask = df["occasion"].map(lambda v: bool(self.occasion_values(v) & wanted)).astype(bool)
+            df = df.loc[mask]
+        return df.copy()
 
     def filter_by_gender(self, df: pd.DataFrame, gender: str) -> pd.DataFrame:
         # Normalize client values (Male/Female from frontend GENDERS) to dataset values (Men/Women)
@@ -91,7 +180,7 @@ class RecommendationService:
         candidates = self.filter_by_gender(df, gender)
         candidates = self.filter_by_size(candidates, size)
         candidates = self.filter_by_price(candidates, requirements.price_preference)
-        return candidates
+        return self.filter_required_attributes(candidates, requirements)
 
     def match_field(
         self, product_val: str, requested_vals: list[str], field_name: str

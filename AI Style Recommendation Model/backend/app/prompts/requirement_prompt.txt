@@ -35,8 +35,16 @@ RULES:
 6. Return ONLY valid JSON, no other text.
 7. Preserve the requested clothing type: "shirt" = "Shirt", "t-shirt" = "T-Shirt", "sweatshirt" = "Sweatshirt". Do not replace a shirt with a top or blouse.
 8. "office wear", "office", and "workwear" use occasion ["Office"]. Preserve explicit colours and clothing types even when no exact product may exist.
+9. A clothing type or colour alone never implies an occasion. "blue dress" must have occasion null. Do not infer Wedding from Dress, or Formal from Shirt.
+10. When no colour is mentioned, preferred_colors must be []. Do not choose a default colour. Preserve explicitly requested shades, including Dark Blue, Sky Blue, and Royal Blue.
 
 EXAMPLE:
+Customer request: "I need a blue dress"
+Response: {"occasion": null, "preferred_colors": ["Blue"], "article_types": ["Dress"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
+Customer request: "I need a dress for a wedding"
+Response: {"occasion": ["Wedding"], "preferred_colors": [], "article_types": ["Dress"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
 Customer request: "i need a red color shirt for office wear"
 Response: {"occasion": ["Office"], "preferred_colors": ["Red"], "article_types": ["Shirt"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
 

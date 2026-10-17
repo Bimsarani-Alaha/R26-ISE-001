@@ -14,7 +14,7 @@ def rows():
     ])
 
 
-def test_rerank_before_top_five_preserves_groups_and_match_scores(monkeypatch):
+def test_rerank_preserves_all_results_groups_and_match_scores(monkeypatch):
     from app.services.cartographer_service import cartographer_service
 
     monkeypatch.setattr(cartographer_service, "score", lambda query, products: [float(p.product_id) for p in products])
@@ -22,7 +22,7 @@ def test_rerank_before_top_five_preserves_groups_and_match_scores(monkeypatch):
     req = RequirementResponse(article_types=["Shirt"], preferred_colors=["Red"])
     baseline, _ = service.calculate_groups(rows(), req, "M")
     exact, alternatives = service.calculate_groups(rows(), req, "M", query="red shirt for office")
-    assert [p.product_id for p in exact] == ["6", "5", "4", "3", "2"]
+    assert [p.product_id for p in exact] == ["6", "5", "4", "3", "2", "1", "0"]
     assert [p.product_id for p in alternatives] == ["8", "7"]
     assert exact[0].match_score == baseline[0].match_score
     assert exact[0].reranker_score == 6.0

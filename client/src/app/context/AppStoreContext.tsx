@@ -17,7 +17,8 @@ const BODY_MEASUREMENTS_STORAGE_KEY = "styleai-body-measurements";
 const REQUIREMENTS_STORAGE_KEY = "styleai-requirements";
 const OCCASION_STORAGE_KEY = "styleai-occasion";
 const SIZE_STORAGE_KEY = "styleai-size";
-const PRODUCT_RESULTS_STORAGE_KEY = "styleai-product-results";
+const PRODUCT_RESULTS_STORAGE_KEY = "styleai-product-results-v2";
+const RESULT_OCCASION_STORAGE_KEY = "styleai-result-occasion-v2";
 const PREDICTION_STORAGE_KEY = "styleai-prediction";
 const RECOMMENDATIONS_STORAGE_KEY = "styleai-recommendations";
 const COLOR_PREF_STORAGE_KEY = "styleai-color-pref";
@@ -48,6 +49,7 @@ type AppStore = {
   prediction: BackendPrediction | null;
   recommendations: ClothingItem[];
   productResults: ProductResult[];
+  resultOccasionUsed: string[] | null;
   bodyMeasurements: BodyMeasurements | null;
   colorPreference: string;
   stylistTipsCache: Record<string, GetStylistResponse>;
@@ -59,6 +61,7 @@ type AppStore = {
   setPrediction: (v: BackendPrediction | null) => void;
   setRecommendations: (v: ClothingItem[]) => void;
   setProductResults: (v: ProductResult[]) => void;
+  setResultOccasionUsed: (v: string[] | null) => void;
   setBodyMeasurements: (v: BodyMeasurements | null) => void;
   setColorPreference: (v: string) => void;
   setStylistTipsCache: (v: Record<string, GetStylistResponse>) => void;
@@ -84,6 +87,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [prediction, setPrediction] = useState<BackendPrediction | null>(null);
   const [recommendations, setRecommendations] = useState<ClothingItem[]>([]);
   const [productResults, setProductResults] = useState<ProductResult[]>([]);
+  const [resultOccasionUsed, setResultOccasionUsed] = useState<string[] | null>(null);
   const [bodyMeasurements, setBodyMeasurementsState] = useState<BodyMeasurements | null>(null);
   const [stylistTipsCache, setStylistTipsCache] = useState<Record<string, GetStylistResponse>>({});
   const [hydrated, setHydrated] = useState(false);
@@ -99,6 +103,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setPrediction(readStorageValue<BackendPrediction | null>(PREDICTION_STORAGE_KEY, null));
     setRecommendations(readStorageValue<ClothingItem[]>(RECOMMENDATIONS_STORAGE_KEY, []));
     setProductResults(readStorageValue<ProductResult[]>(PRODUCT_RESULTS_STORAGE_KEY, []));
+    setResultOccasionUsed(readStorageValue<string[] | null>(RESULT_OCCASION_STORAGE_KEY, null));
     setStylistTipsCache(readStorageValue<Record<string, GetStylistResponse>>(STYLIST_TIPS_STORAGE_KEY, {}));
     setHydrated(true);
   }, []);
@@ -157,6 +162,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
+    window.localStorage.setItem(RESULT_OCCASION_STORAGE_KEY, JSON.stringify(resultOccasionUsed));
+  }, [resultOccasionUsed, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
     window.localStorage.setItem(STYLIST_TIPS_STORAGE_KEY, JSON.stringify(stylistTipsCache));
   }, [stylistTipsCache, hydrated]);
 
@@ -187,6 +197,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       prediction,
       recommendations,
       productResults,
+      resultOccasionUsed,
       bodyMeasurements,
       colorPreference,
       stylistTipsCache,
@@ -198,6 +209,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setPrediction,
       setRecommendations,
       setProductResults,
+      setResultOccasionUsed,
       setBodyMeasurements,
       setColorPreference,
       setStylistTipsCache,
@@ -211,6 +223,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       prediction,
       recommendations,
       productResults,
+      resultOccasionUsed,
       bodyMeasurements,
       colorPreference,
       stylistTipsCache,

@@ -15,7 +15,7 @@ def products():
     ])
 
 
-def test_visual_ranking_selects_before_top_five_and_keeps_metadata_groups(monkeypatch):
+def test_visual_ranking_keeps_all_results_and_metadata_groups(monkeypatch):
     from app.services.fashionclip_service import fashionclip_service
     from app.services.cartographer_service import cartographer_service
 
@@ -23,7 +23,7 @@ def test_visual_ranking_selects_before_top_five_and_keeps_metadata_groups(monkey
     monkeypatch.setattr(cartographer_service, "score", lambda *args: pytest.fail("Visual ranking available"))
     req = RequirementResponse(article_types=["Shirt"], preferred_colors=["Red"])
     exact, alternatives = RankingService().calculate_groups(products(), req, "M", "red office shirt")
-    assert [p.product_id for p in exact] == ["6", "5", "4", "3", "2"]
+    assert [p.product_id for p in exact] == ["6", "5", "4", "3", "2", "1", "0"]
     assert [p.product_id for p in alternatives] == ["8", "7"]
     assert exact[0].visual_score == pytest.approx(0.6)
     assert exact[0].reranker_score is None

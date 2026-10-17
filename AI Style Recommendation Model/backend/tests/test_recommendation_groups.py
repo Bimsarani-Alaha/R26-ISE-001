@@ -29,8 +29,7 @@ def test_red_office_shirts_are_separate_from_partial_matches():
     assert [p.product_id for p in exact] == ["exact"]
     by_id = {p.product_id: p for p in alternatives}
     assert by_id["blue"].unmatched_requirements == ["colour"]
-    assert by_id["party"].unmatched_requirements == ["occasion"]
-    assert by_id["top"].unmatched_requirements == ["clothing type"]
+    assert set(by_id) == {"blue"}
     assert all(p.match_category == "alternative" for p in alternatives)
     assert exact[0].match_category == "exact"
 
@@ -41,17 +40,18 @@ def test_colour_only_exact_matches_are_not_dropped_by_score_threshold():
     assert alternatives == []
 
 
-def test_partial_colour_names_are_not_exact_matches():
+def test_related_colour_shades_are_primary_matches():
     exact, alternatives = groups([product("navy", colour="Navy Blue")], preferred_colors=["Blue"])
-    assert exact == []
-    assert alternatives[0].unmatched_requirements == ["colour"]
+    assert [p.product_id for p in exact] == ["navy"]
+    assert exact[0].colour_match == "shade"
+    assert alternatives == []
 
 
-def test_exact_and_alternative_limits_are_applied_independently():
+def test_all_matching_colours_are_returned_in_separate_groups():
     rows = [product(f"blue-{i}", colour="Blue") for i in range(8)] + [product("red")]
     exact, alternatives = groups(rows, preferred_colors=["Red"], article_types=["Shirt"], occasion=["Office"])
     assert [p.product_id for p in exact] == ["red"]
-    assert len(alternatives) == 5
+    assert len(alternatives) == 8
     assert not ({p.product_id for p in exact} & {p.product_id for p in alternatives})
 
 
