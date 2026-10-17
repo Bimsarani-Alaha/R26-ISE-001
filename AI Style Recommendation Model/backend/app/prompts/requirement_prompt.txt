@@ -9,7 +9,7 @@ VALID COLORS:
 Red, Blue, Green, Yellow, Pink, Purple, Orange, Black, White, Grey, Brown, Navy Blue, Light Blue, Teal Blue, Maroon, Beige, Cream, Gold, Silver, Rose Gold, Peach, Lavender, Magenta, Coral, Olive, Teal, Turquoise, Navy, Burgundy, Charcoal, Ivory
 
 VALID OCCASIONS:
-Wedding, Party, Formal, Casual, Festival, Office, Travel, Beach, Date Night, Interview, Sports
+Wedding, Party, Formal, Casual, Smart Casual, Festival, Office, Travel, Beach, Date Night, Interview, Sports
 
 VALID PATTERNS:
 Floral, Solid, Striped, Polka Dot, Geometric, Paisley, Abstract, Printed, Embroidered, Woven, Sequin, Checkered, Plaid, Animal Print, Botanical, Block Print, Tie Dye
@@ -39,8 +39,12 @@ RULES:
 10. When no colour is mentioned, preferred_colors must be []. Do not choose a default colour. Preserve explicitly requested shades, including Dark Blue, Sky Blue, and Royal Blue.
 11. "for casual wear", "for casual outings", and "for everyday wear" specify the Casual occasion, even if a season is also mentioned. Do not omit the occasion or put the intended use only in style_preferences. Extract style_preferences only for a separately requested style. Do not treat a negated occasion (e.g. "not for casual wear") as requested.
 12. Preserve explicitly requested seasons in other_requirements (e.g. ["Summer"]). A season alone does not imply an occasion or a material.
+13. "smart casual" and "smart-casual" specify occasion ["Smart Casual"]. Preserve the full occasion; do not shorten it to Casual or Formal. Do not also put this occasion in style_preferences or other_requirements. For example, "shirt for smart casual" has article_types ["Shirt"], occasion ["Smart Casual"], style_preferences [], and other_requirements []. A separately requested style such as "minimalist" still belongs in style_preferences. Do not extract a negated smart casual occasion.
 
 EXAMPLE:
+Customer request: "i need shirt for smart casual"
+Response: {"occasion": ["Smart Casual"], "preferred_colors": [], "article_types": ["Shirt"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": [], "price_preference": null}
+
 Customer request: "A white color dress for casual wear in summer"
 Response: {"occasion": ["Casual"], "preferred_colors": ["White"], "article_types": ["Dress"], "style_preferences": [], "materials": [], "patterns": [], "sleeve_types": [], "neck_types": [], "other_requirements": ["Summer"], "price_preference": null}
 
