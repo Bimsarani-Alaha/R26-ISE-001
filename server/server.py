@@ -75,7 +75,7 @@ if not STYLE_RECOMMENDATION_BACKEND.is_dir():
     )
 sys.path.insert(0, str(STYLE_RECOMMENDATION_BACKEND))
 
-from app.main import app as styleanalyzer_app  # noqa: E402
+from src.app.main import app as styleanalyzer_app  # noqa: E402
 
 
 app = FastAPI(
