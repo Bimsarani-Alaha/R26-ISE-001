@@ -216,6 +216,8 @@ class RankingService:
             if not normalized:
                 unverified.append(field)
                 continue
+            if field == "occasion" and normalized & self.candidates.requested_occasion_values(requested):
+                continue
             if not any(self._normalize(v, field) in normalized for v in requested):
                 unmatched.append(field)
         # Free-text needs have no dedicated supporting attributes in this schema.
@@ -231,6 +233,10 @@ class RankingService:
     ) -> float:
         if not product_occasion or not requested_occasions:
             return 0.0
+
+        if (self.candidates.occasion_values(product_occasion)
+                & self.candidates.requested_occasion_values(requested_occasions)):
+            return 1.0
 
         product_occasions = [
             self.catalog.normalize_occasion(o.strip())

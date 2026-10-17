@@ -119,10 +119,21 @@ class RecommendationService:
             ).astype(bool)
             df = df.loc[mask]
         if requirements.occasion:
-            wanted = set().union(*(self.occasion_values(v) for v in requirements.occasion))
+            wanted = self.requested_occasion_values(requirements.occasion)
             mask = df["occasion"].map(lambda v: bool(self.occasion_values(v) & wanted)).astype(bool)
             df = df.loc[mask]
         return df.copy()
+
+    def requested_occasion_values(self, occasions: list[str]) -> set[str]:
+        wanted = set().union(*(self.occasion_values(v) for v in occasions))
+        office_aliases = {"office", "office wear", "workwear", "work", "office meeting"}
+        # Expand the request only: Smart Casual products remain distinct from
+        # Formal products for customers explicitly requesting either dress code.
+        if any(part.strip().casefold() in office_aliases
+               for value in occasions
+               for part in re.split(r"[,/;]|\band\b|&", value, flags=re.IGNORECASE)):
+            wanted.update({"formal", "smart casual"})
+        return wanted
 
     def filter_by_gender(self, df: pd.DataFrame, gender: str) -> pd.DataFrame:
         # Normalize client values (Male/Female from frontend GENDERS) to dataset values (Men/Women)

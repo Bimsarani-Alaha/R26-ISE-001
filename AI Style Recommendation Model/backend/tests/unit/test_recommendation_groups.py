@@ -20,6 +20,31 @@ def groups(rows, **preferences):
     return ranking_service.calculate_groups(pd.DataFrame(rows), RequirementResponse(**preferences), "M")
 
 
+@pytest.mark.parametrize("occasion", ["Office", "office wear", "workwear", "work", "office meeting"])
+def test_office_requests_include_formal_and_smart_casual(occasion):
+    rows = [product("formal", occasion="Formal"),
+            product("smart", occasion="Casual/Smart Casual"),
+            product("casual", occasion="Casual"), product("party", occasion="Party")]
+    req = RequirementResponse(article_types=["Shirt"], occasion=[occasion])
+    candidates = recommendation_service.generate_candidates(pd.DataFrame(rows), "Women", "M", req)
+    exact, alternatives = ranking_service.calculate_groups(candidates, req, "M")
+    assert {p.product_id for p in exact} == {"formal", "smart"}
+    assert alternatives == []
+    assert all(not p.unmatched_requirements for p in exact)
+    assert ranking_service._score_occasion("Casual/Smart Casual", [occasion]) == 1.0
+
+
+@pytest.mark.parametrize("occasion, expected", [("Formal", {"formal"}), ("Smart Casual", {"smart"})])
+def test_explicit_dress_codes_remain_specific(occasion, expected):
+    exact, alternatives = groups([
+        product("formal", occasion="Formal"),
+        product("smart", occasion="Casual/Smart Casual"),
+        product("casual", occasion="Casual"),
+    ], occasion=[occasion])
+    assert {p.product_id for p in exact} == expected
+    assert alternatives == []
+
+
 def test_red_office_shirts_are_separate_from_partial_matches():
     exact, alternatives = groups([
         product("exact"), product("blue", colour="Blue"),
