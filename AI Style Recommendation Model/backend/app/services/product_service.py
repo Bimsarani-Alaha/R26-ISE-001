@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import re
 from pathlib import Path
 from typing import Optional
 from ..config import (
@@ -28,6 +29,7 @@ class ProductService:
 
         df = pd.read_csv(DATASET_PATH)
         self._validate_columns(df)
+        self._normalize_article_types(df)
         self._normalize_sizes(df)
         self._validate_prices(df)
         self._validate_image_paths(df)
@@ -41,6 +43,24 @@ class ProductService:
             raise ValueError(f"Missing columns: {missing}")
         if extra:
             print(f"Warning: extra columns found: {extra}")
+
+    def _normalize_article_types(self, df: pd.DataFrame):
+        def normalize(row):
+            article = str(row["article_type"]).strip()
+            description = str(row.get("description", "")).casefold()
+            # Some catalog shirts have only the broad "Top" label. Refine it
+            # from explicit garment metadata without treating every top as a shirt.
+            if article.casefold() != "top":
+                return article
+            if re.search(r"\b(?:t[ -]?shirt|sweatshirt|polo shirt|shirt jacket|shirt dress)\b", description):
+                return article
+            if re.search(r"\bshirt\b", description) and re.search(
+                r"\b(?:button[ -](?:front|down)|dress shirt)\b", description
+            ):
+                return "Shirt"
+            return article
+
+        df["article_type"] = df.apply(normalize, axis=1)
 
     def _normalize_sizes(self, df: pd.DataFrame):
         def parse_sizes(val):
@@ -70,27 +90,27 @@ class ProductService:
 
         df["image_exists"] = df["image_path"].apply(check_image)
 
-    def get_all_products(self) -> pd.DataFrame:
+    def _ensure_loaded(self):
         if self.df is None:
             self.load_dataset()
+
+    def get_all_products(self) -> pd.DataFrame:
+        self._ensure_loaded()
         return self.df
 
     def get_product_by_id(self, product_id: str) -> Optional[dict]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         row = self.df[self.df["product_id"] == product_id]
         if row.empty:
             return None
         return row.iloc[0].to_dict()
 
     def get_unique_genders(self) -> list[str]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         return sorted(self.df["gender"].dropna().unique().tolist())
 
     def get_unique_occasions(self) -> list[str]:
-        if self.df is None:
-            self.load_dataset()
+        self._ensure_loaded()
         occasions = set()
         for val in self.df["occasion"].dropna().unique():
             for part in str(val).replace("/", ",").split(","):

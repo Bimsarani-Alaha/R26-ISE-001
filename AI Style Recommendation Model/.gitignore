@@ -10,7 +10,19 @@ build/
 Thumbs.db
 *.log
 results/
+.cache/
+.pytest_cache/
+.pytest-tmp-cartographer/
 
 .superpowers
 docs
-images
+images/
+Images/
+
+# Download model weights locally; keep them out of Git.
+/backend/app/RankerModel/*.safetensors
+/backend/app/RankerModel/*.bin
+/backend/app/RankerModel/*.onnx
+/backend/app/fashionclip/*.safetensors
+/backend/app/fashionclip/*.bin
+/backend/app/fashionclip/onnx/

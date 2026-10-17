@@ -92,6 +92,7 @@ app.add_middleware(
 )
 
 app.mount("/coloranalyzer", coloranalyzer_app)
+app.mount("/fashion-recommendation", styleanalyzer_app)
 app.mount("/styleanalyzer", styleanalyzer_app)
 app.mount("/cvdmatcher", cvdmatcher_app)
 

@@ -1,9 +1,11 @@
 import pandas as pd
-from typing import Optional
 from ..schemas.models import RequirementResponse, ProductResult
-from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION, TOP_K, MIN_SCORE_THRESHOLD
+from ..config import WEIGHTS_WITH_OCCASION, WEIGHTS_WITHOUT_OCCASION
 from ..services.recommendation_service import recommendation_service
 from ..services.product_service import product_service
+from ..services.cartographer_service import cartographer_service
+from ..services.fashionclip_service import fashionclip_service
+from ..config import RANKER_CANDIDATES_PER_GROUP
 
 
 class RankingService:
@@ -15,33 +17,35 @@ class RankingService:
         candidates: pd.DataFrame,
         requirements: RequirementResponse,
         selected_size: str,
+        query: str = "",
     ) -> list[ProductResult]:
+        return self.calculate_groups(candidates, requirements, selected_size, query)[0]
+
+    def calculate_groups(
+        self,
+        candidates: pd.DataFrame,
+        requirements: RequirementResponse,
+        selected_size: str,
+        query: str = "",
+    ) -> tuple[list[ProductResult], list[ProductResult]]:
+        candidates = recommendation_service.filter_required_attributes(candidates, requirements)
         has_occasion = bool(requirements.occasion)
         weights = WEIGHTS_WITH_OCCASION if has_occasion else WEIGHTS_WITHOUT_OCCASION
-        has_article_filter = bool(requirements.article_types)
 
         scored = []
         for _, row in candidates.iterrows():
             score_breakdown = {}
             total_score = 0.0
 
-            at_score = recommendation_service.match_field(
-                str(row.get("article_type", "")),
-                requirements.article_types,
-                "article_type",
-            )
-
-            if has_article_filter and at_score == 0.0:
-                continue
+            at_score = float(recommendation_service.matches_article_type(
+                row.get("article_type"), requirements.article_types,
+            ))
 
             score_breakdown["article_type"] = at_score
             total_score += at_score * weights.get("article_type", 0)
 
-            colour_score = recommendation_service.match_field(
-                str(row.get("base_colour", "")),
-                requirements.preferred_colors,
-                "base_colour",
-            )
+            colour_match = recommendation_service.colour_match(row.get("base_colour"), requirements.preferred_colors)
+            colour_score = {"exact": 1.0, "shade": 0.8}.get(colour_match, 0.0)
             score_breakdown["base_colour"] = colour_score
             total_score += colour_score * weights.get("base_colour", 0)
 
@@ -101,7 +105,11 @@ class RankingService:
                 row, requirements, score_breakdown, has_occasion
             )
 
+            mismatches, unverified = self._requirement_evidence(row, requirements)
             product_result = ProductResult(
+                colour_match=colour_match,
+                unmatched_requirements=mismatches,
+                unverified_requirements=unverified,
                 product_id=str(row["product_id"]),
                 image_path=str(row.get("image_path", "")),
                 article_type=str(row.get("article_type", "")),
@@ -119,11 +127,106 @@ class RankingService:
                 neck_type=str(row.get("neck_type", "")),
                 description=str(row.get("description", "")),
             )
+            if mismatches or unverified:
+                product_result.match_category = "alternative"
+                parts = ["Similar alternative in your selected size."]
+                if mismatches:
+                    parts.append(f"Differs in: {', '.join(mismatches)}.")
+                if unverified:
+                    parts.append(f"Not verified: {', '.join(unverified)}.")
+                product_result.explanation = " ".join(parts)
             scored.append(product_result)
 
-        scored.sort(key=lambda x: x.match_score, reverse=True)
-        filtered = [p for p in scored if p.match_score >= MIN_SCORE_THRESHOLD]
-        return filtered[:TOP_K]
+        def colour_priority(product):
+            return {"exact": 2, "shade": 1}.get(product.colour_match, 0)
+
+        scored.sort(key=lambda p: (colour_priority(p), p.match_score), reverse=True)
+        exact = [p for p in scored if p.match_category == "exact"]
+        alternatives = [p for p in scored if p.match_category == "alternative" and p.match_score > 0]
+        if query.strip():
+            shortlist = exact[:RANKER_CANDIDATES_PER_GROUP] + alternatives[:RANKER_CANDIDATES_PER_GROUP]
+            visual = fashionclip_service.score(query, shortlist)
+            if visual is not None:
+                for product, score in zip(shortlist, visual):
+                    product.visual_score = score
+                # Keep catalogue evidence authoritative. Missing images sort after
+                # scored images within their group, retaining metadata order.
+                def visual_key(product):
+                    return (product.visual_score is not None,
+                            product.visual_score if product.visual_score is not None else 0.0)
+                exact.sort(key=lambda p: (colour_priority(p), *visual_key(p)), reverse=True)
+                alternatives.sort(key=visual_key, reverse=True)
+                return exact, alternatives
+            relevance = cartographer_service.score(query, shortlist)
+            if relevance is not None:
+                for product, score in zip(shortlist, relevance):
+                    product.reranker_score = score
+                def relevance_key(product):
+                    return (product.reranker_score is not None,
+                            product.reranker_score if product.reranker_score is not None else 0.0)
+                exact.sort(key=lambda p: (colour_priority(p), *relevance_key(p)), reverse=True)
+                alternatives.sort(key=relevance_key, reverse=True)
+        # Keep every eligible result so colours and occasion groups are not lost
+        # behind a global top-five limit. AI inference remains bounded above.
+        return exact, alternatives
+
+    @staticmethod
+    def _normalize(value: str, field: str) -> str:
+        value = str(value).strip().casefold()
+        if field == "clothing type":
+            return recommendation_service.normalize_article_type(value)
+        if field == "occasion":
+            value = product_service.normalize_occasion(value).casefold()
+        aliases = {
+            "colour": {"gray": "grey"},
+        }
+        return aliases.get(field, {}).get(value, value)
+
+    def _unmatched_requirements(self, row: pd.Series, requirements: RequirementResponse) -> list[str]:
+        return self._requirement_evidence(row, requirements)[0]
+
+    def _requirement_evidence(
+        self, row: pd.Series, requirements: RequirementResponse
+    ) -> tuple[list[str], list[str]]:
+        """Separate known differences from requirements lacking catalogue evidence."""
+        unmatched = []
+        unverified = []
+        for field, column, requested in (
+            ("colour", "base_colour", requirements.preferred_colors),
+            ("clothing type", "article_type", requirements.article_types),
+            ("occasion", "occasion", requirements.occasion),
+            ("style", "style", requirements.style_preferences),
+            ("material", "material", requirements.materials),
+            ("pattern", "pattern", requirements.patterns),
+            ("sleeve type", "sleeve_type", requirements.sleeve_types),
+            ("neckline", "neck_type", requirements.neck_types),
+        ):
+            if not requested:
+                continue
+            value = row.get(column)
+            if field == "clothing type" and recommendation_service.matches_article_type(value, requested):
+                continue
+            if field == "colour" and recommendation_service.colour_match(value, requested) in {"exact", "shade"}:
+                continue
+            # Only occasion is a multi-value source field. Keep compound
+            # material/garment labels intact rather than treating them as options.
+            actual = [] if pd.isna(value) else (
+                list(recommendation_service.occasion_values(value)) if field == "occasion" else [str(value)]
+            )
+            normalized = {self._normalize(v, field) for v in actual}
+            normalized -= {"", "unknown", "n/a", "na", "none", "null", "nan"}
+            if not normalized:
+                unverified.append(field)
+                continue
+            if not any(self._normalize(v, field) in normalized for v in requested):
+                unmatched.append(field)
+        # Free-text needs have no dedicated supporting attributes in this schema.
+        # A generated description or a material guess cannot verify them.
+        for requirement in requirements.other_requirements:
+            requirement = requirement.strip()
+            if requirement and requirement not in unverified:
+                unverified.append(requirement)
+        return unmatched, unverified
 
     def _score_occasion(
         self, product_occasion: str, requested_occasions: list[str]
