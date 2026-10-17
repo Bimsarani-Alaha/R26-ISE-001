@@ -18,3 +18,11 @@ results/
 docs
 images/
 Images/
+
+# Download model weights locally; keep them out of Git.
+/backend/app/RankerModel/*.safetensors
+/backend/app/RankerModel/*.bin
+/backend/app/RankerModel/*.onnx
+/backend/app/fashionclip/*.safetensors
+/backend/app/fashionclip/*.bin
+/backend/app/fashionclip/onnx/
