@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import logging
 import os
 import sys
@@ -75,7 +76,7 @@ if not STYLE_RECOMMENDATION_BACKEND.is_dir():
     )
 sys.path.insert(0, str(STYLE_RECOMMENDATION_BACKEND))
 
-from src.app.main import app as styleanalyzer_app  # noqa: E402
+from app.main import app as styleanalyzer_app  # noqa: E402
 
 
 app = FastAPI(
@@ -102,6 +103,9 @@ ESTIMATED_HEIGHT_CALIBRATION_OFFSET_CM = 23.3
 
 class HealthTipsRequest(BaseModel):
     clothing_size: str = Field(min_length=1, max_length=20)
+    height_cm: float | None = Field(default=None, gt=0, le=300)
+    shoulder_cm: float | None = Field(default=None, gt=0, le=300)
+    hip_cm: float | None = Field(default=None, gt=0, le=300)
 
 
 HEALTH_TIPS_CACHE_SECONDS = float(os.getenv("HEALTH_TIPS_CACHE_SECONDS", "900"))
@@ -133,7 +137,7 @@ async def save_system(payload: UserRequest) -> dict:
             detail="MongoDB is unavailable. Please check the MongoDB connection and try again.",
         )
 
-    document = payload.model_dump(exclude_none=True)
+    document = payload.dict(exclude_none=True)
     document["savedAt"] = datetime.now(timezone.utc).isoformat()
 
     try:
@@ -160,9 +164,13 @@ async def save_system(payload: UserRequest) -> dict:
 
 @app.post("/api/health-tips")
 async def health_tips(request: HealthTipsRequest) -> dict[str, str]:
-    cache_key = request.clothing_size.strip()
-    if not cache_key:
+    clothing_size = request.clothing_size.strip()
+    if not clothing_size:
         raise HTTPException(status_code=422, detail="A predicted clothing size is required.")
+
+    cache_payload = request.dict(exclude_none=True)
+    cache_payload["clothing_size"] = clothing_size
+    cache_key = json.dumps(cache_payload, sort_keys=True)
 
     async with health_tips_request_lock:
         cached = health_tips_cache.get(cache_key)
@@ -170,7 +178,12 @@ async def health_tips(request: HealthTipsRequest) -> dict[str, str]:
             return {"guidance": cached[1]}
 
         try:
-            guidance = await generate_health_tips(cache_key)
+            guidance = await generate_health_tips(
+                clothing_size,
+                height_cm=request.height_cm,
+                shoulder_cm=request.shoulder_cm,
+                hip_cm=request.hip_cm,
+            )
         except HealthTipsConfigurationError as error:
             logger.error("Health tips service configuration error: %s", error)
             raise HTTPException(status_code=503, detail="The guidance service is not configured.") from error
