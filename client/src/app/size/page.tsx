@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Camera, ImagePlus } from "lucide-react";
+import { ArrowUpRight, Camera, Focus, ImagePlus } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -31,6 +31,22 @@ type PoseReadiness = {
   frame_height: number;
 };
 
+const POSE_CHECK_INTERVAL_MS = 1000;
+const POSE_REQUEST_TIMEOUT_MS = 15000;
+const MAX_CAPTURE_DIMENSION = 1280;
+const CAPTURE_JPEG_QUALITY = 0.85;
+type ApiMode = "PC" | "MOBILE";
+const MODE: ApiMode = "MOBILE";
+const getApiBaseUrl = (mode: ApiMode = MODE) => {
+  const mobileApiUrl =
+    process.env.NEXT_PUBLIC_MOBILE_URL?.replace(/\/+$/, "") ||
+    "https://mds3m8h8-8000.asse.devtunnels.ms";
+  const pcApiUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
+    "http://localhost:8000";
+  return mode === "MOBILE" ? mobileApiUrl : pcApiUrl;
+};
+
 export default function SizePage() {
   const router = useRouter();
   const {
@@ -59,6 +75,7 @@ export default function SizePage() {
   const [poseBox, setPoseBox] = useState<[number, number, number, number] | null>(
     null,
   );
+  const [poseCheckVersion, setPoseCheckVersion] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -115,29 +132,38 @@ export default function SizePage() {
     );
   }, [cameraReady, poseBox]);
 
+  // The version token deliberately restarts this polling effect on manual reset.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: used as an explicit polling restart trigger
   useEffect(() => {
     if (!cameraOpen || !cameraReady || mode !== "camera") return;
 
     let cancelled = false;
     let requestInProgress = false;
     let timer: number | undefined;
+    let activeController: AbortController | null = null;
     let consecutiveReadyFrames = 0;
     let consecutiveUnreadyFrames = 0;
     let stableReady = false;
 
-    const scheduleNextFrame = () => {
-      if (!cancelled) timer = window.setTimeout(checkPose, 700);
+    const scheduleNextCheck = () => {
+      if (!cancelled) {
+        timer = window.setTimeout(
+          () => void checkPose(),
+          POSE_CHECK_INTERVAL_MS,
+        );
+      }
     };
 
     const checkPose = async () => {
       if (cancelled || requestInProgress) return;
       const video = videoRef.current;
       if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        scheduleNextFrame();
+        scheduleNextCheck();
         return;
       }
 
       requestInProgress = true;
+      let requestTimeout: number | undefined;
       try {
         const frame = document.createElement("canvas");
         frame.width = video.videoWidth;
@@ -149,13 +175,21 @@ export default function SizePage() {
         const blob = await new Promise<Blob | null>((resolve) =>
           frame.toBlob(resolve, "image/jpeg", 0.72),
         );
+        if (cancelled) return;
         if (!blob) throw new Error("Unable to prepare the live camera frame.");
 
         const formData = new FormData();
         formData.append("file", blob, "live-camera-frame.jpg");
-        const response = await fetch("http://localhost:8000/pose-readiness", { //see if the user is in 2m distance and full body is visible
+        const controller = new AbortController();
+        activeController = controller;
+        requestTimeout = window.setTimeout(
+          () => controller.abort(),
+          POSE_REQUEST_TIMEOUT_MS,
+        );
+        const response = await fetch(`${getApiBaseUrl()}/pose-readiness`, {
           method: "POST",
           body: formData,
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`Live pose check failed (${response.status}).`);
@@ -164,6 +198,10 @@ export default function SizePage() {
         const result = (await response.json()) as PoseReadiness;
         if (cancelled) return;
         setPoseBox(result.box);
+        const statusMessage =
+          result.reason === "low_confidence"
+            ? "Pose detected, but it is not clear enough yet. Face the camera, improve the lighting, and keep your whole body visible. Checking again automatically."
+            : result.message;
 
         if (result.ready) {
           consecutiveReadyFrames += 1;
@@ -172,7 +210,7 @@ export default function SizePage() {
           setPoseReady(stableReady);
           setPoseStatus(
             stableReady
-              ? result.message
+              ? statusMessage
               : "Hold still while we confirm your full-body position.",
           );
         } else {
@@ -192,33 +230,53 @@ export default function SizePage() {
           setPoseStatus(
             stableReady
               ? "Hold this position while the camera confirms your pose."
-              : result.message,
+              : statusMessage,
           );
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          console.error("Live pose check failed:", error);
+          const isAbortError =
+            error instanceof Error && error.name === "AbortError";
+          if (!isAbortError) {
+            console.error("Live pose check failed:", error);
+          }
           consecutiveReadyFrames = 0;
           consecutiveUnreadyFrames += 1;
           if (consecutiveUnreadyFrames >= 2) stableReady = false;
           setPoseReady(stableReady);
           setPoseBox(null);
           setPoseStatus(
-            "Unable to check your live pose. Check that the size-analysis server is running.",
+            isAbortError
+              ? "The pose check timed out. Checking again automatically; please check the size-analysis server if this continues."
+              : error instanceof TypeError
+                ? `Could not reach the ${MODE} backend at ${getApiBaseUrl()}. Check that the backend is running and reachable from this device. On a phone, do not use localhost for a PC backend; use its network address or select MOBILE. Retrying automatically.`
+                : "Unable to check your live pose. Check that the size-analysis server is running. Retrying automatically.",
           );
         }
       } finally {
+        if (requestTimeout !== undefined) {
+          window.clearTimeout(requestTimeout);
+        }
+        activeController = null;
         requestInProgress = false;
-        scheduleNextFrame();
+        scheduleNextCheck();
       }
     };
 
-    checkPose();
+    void checkPose();
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
+      activeController?.abort();
     };
-  }, [cameraOpen, cameraReady, mode]);
+  }, [cameraOpen, cameraReady, mode, poseCheckVersion]);
+
+  const resetPoseCheck = () => {
+    setPoseReady(false);
+    setPoseBox(null);
+    setPoseStatus("Checking your pose...");
+    setPoseCheckVersion((version) => version + 1);
+  };
 
   useEffect(() => {
     return () => {
@@ -336,8 +394,13 @@ export default function SizePage() {
     }
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const scale = Math.min(
+      1,
+      MAX_CAPTURE_DIMENSION / video.videoWidth,
+      MAX_CAPTURE_DIMENSION / video.videoHeight,
+    );
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
     const context = canvas.getContext("2d");
     if (!context) {
       setMessage("Unable to capture an image from the camera.");
@@ -356,7 +419,7 @@ export default function SizePage() {
       handleFile(capturedPhoto);
       stopCamera();
       void handlePredict(capturedPhoto);
-    }, "image/jpeg", 0.92);
+    }, "image/jpeg", CAPTURE_JPEG_QUALITY);
   };
 
   useEffect(() => {
@@ -401,7 +464,7 @@ export default function SizePage() {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:8000/predict", { //size prediction API
+      const res = await fetch(`${getApiBaseUrl()}/predict`, {
         method: "POST",
         body: formData,
       });
@@ -454,9 +517,11 @@ export default function SizePage() {
     } catch (err) {
       console.error(err);
       setMessage(
-        err instanceof Error
-          ? err.message
-          : "Prediction failed. Please try again.",
+        err instanceof TypeError
+          ? `Could not reach the ${MODE} prediction API at ${getApiBaseUrl()}. Check that the server is running and reachable from this device, then try again.`
+          : err instanceof Error
+            ? err.message
+            : "Prediction failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -683,6 +748,16 @@ export default function SizePage() {
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                         />
+                        <button
+                          type="button"
+                          onClick={resetPoseCheck}
+                          disabled={!cameraReady}
+                          aria-label="Reset pose check"
+                          title="Reset pose check"
+                          className="absolute right-3 top-3 z-10 rounded-md border border-white/30 bg-black/60 p-2 text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Focus className="h-5 w-5" />
+                        </button>
                       </div>
                       <p
                         role="status"
