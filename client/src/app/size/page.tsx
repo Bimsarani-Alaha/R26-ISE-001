@@ -753,7 +753,7 @@ export default function SizePage() {
               {mode === "camera" ? (
                 <div className="mt-4">
                   <p
-                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg"
+                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-sm leading-6 text-[#666] sm:text-sm"
                   >
                     Please move back until you are approximately{" "}
                     <strong className="font-semibold text-[#111]">
@@ -868,7 +868,7 @@ export default function SizePage() {
                     placeholder="e.g. 170"
                     className="mt-2 w-full border border-[#d7d7d7] bg-white px-3 py-2.5 text-base text-[#111] outline-none focus:border-[#111]"
                   />
-                  <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg">
+                  <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-sm leading-6 text-[#666]">
                     Take the photo from about 2 metres away. Height is used only
                     to scale the pixel measurements into centimeters; it does
                     not change the pixel-based size prediction. If left blank,
@@ -1071,21 +1071,17 @@ export default function SizePage() {
               className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              WELLNESS GUIDANCE
+              Wellness Guide
               <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.7 }}
+            <Button
               onClick={() => router.push("/recommendation")}
-              className="flex items-center gap-2 bg-white/90 px-7 py-3 text-xs tracking-[0.2em] text-[#111] backdrop-blur-sm transition-all duration-300 hover:bg-white"
+              className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              Get Recommendations
+              Get Recommendation
               <ArrowUpRight className="h-3.5 w-3.5" />
-            </motion.button>
+            </Button>
           </div>
         )}
       </main>
