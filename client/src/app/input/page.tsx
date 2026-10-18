@@ -21,8 +21,8 @@ const OCCASIONS = [
 ];
 
 const EXAMPLE_PROMPTS = [
-  "A formal outfit for an office meeting in hot weather",
-  "A casual summer outfit for a beach day with friends",
+  "A black dress for casual wear",
+  "A blue frock for a formal event",
   "Party look for a rooftop event in the evening",
 ];
 
@@ -175,7 +175,7 @@ export default function InputPage() {
                 value={requirements}
                 onChange={handleTextChange}
                 placeholder={
-                  "Describe your outfit needs…\n\nE.g. I need a formal outfit for an office meeting in hot weather"
+                  "Describe your outfit needs…\n\nE.g. I need A black dress for casual wear"
                 }
                 maxLength={500}
                 rows={6}
