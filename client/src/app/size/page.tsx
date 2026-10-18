@@ -36,7 +36,7 @@ const POSE_REQUEST_TIMEOUT_MS = 15000;
 const MAX_CAPTURE_DIMENSION = 1280;
 const CAPTURE_JPEG_QUALITY = 0.85;
 type ApiMode = "PC" | "MOBILE";
-const MODE: ApiMode = "MOBILE";
+const MODE: ApiMode = "PC";
 const getApiBaseUrl = (mode: ApiMode = MODE) => {
   const mobileApiUrl =
     process.env.NEXT_PUBLIC_MOBILE_URL?.replace(/\/+$/, "") ||
@@ -462,6 +462,10 @@ export default function SizePage() {
 
     setLoading(true);
     setMessage("");
+    setResultImage("");
+    setMeasurements([]);
+    setPredictedSize(null);
+    setBodyMeasurements(null);
 
     try {
       const res = await fetch(`${getApiBaseUrl()}/predict`, {
@@ -485,14 +489,40 @@ export default function SizePage() {
         annotated_image?: string;
         measurements?: Measurement[];
       };
-      const predictionMeasurements = data.measurements ?? [];
-      const firstMeasurement = predictionMeasurements[0];
+      const annotatedImage =
+        typeof data.annotated_image === "string" &&
+        data.annotated_image.startsWith("data:image/")
+          ? data.annotated_image
+          : "";
+      if (!annotatedImage) {
+        throw new Error(
+          "We couldn't annotate this image. Please try a clear, supported image of one person.",
+        );
+      }
 
-      setResultImage(data.annotated_image ?? "");
-      setMeasurements(predictionMeasurements);
-      setPredictedSize(firstMeasurement?.size ?? null);
+      const predictionMeasurements = Array.isArray(data.measurements)
+        ? data.measurements
+        : [];
+      if (predictionMeasurements.length === 0) {
+        throw new Error(
+          "No person or full-body pose was detected. Upload a clear photo of one person with their whole body in frame.",
+        );
+      }
+
+      const firstMeasurement = predictionMeasurements[0];
       if (
-        firstMeasurement?.size &&
+        typeof firstMeasurement?.size !== "string" ||
+        !firstMeasurement.size.trim()
+      ) {
+        throw new Error(
+          "We couldn't predict a clothing size from this image. Try a clear, full-body photo of one person.",
+        );
+      }
+
+      setResultImage(annotatedImage);
+      setMeasurements(predictionMeasurements);
+      setPredictedSize(firstMeasurement.size);
+      if (
         typeof firstMeasurement.height_cm === "number" &&
         Number.isFinite(firstMeasurement.height_cm) &&
         typeof firstMeasurement.shoulder_cm === "number" &&
@@ -510,12 +540,12 @@ export default function SizePage() {
       } else {
         setBodyMeasurements(null);
       }
-
-      if (predictionMeasurements.length === 0) {
-        setMessage("No full-body pose was detected. Try a clear image with your full body in frame.");
-      }
     } catch (err) {
       console.error(err);
+      setResultImage("");
+      setMeasurements([]);
+      setPredictedSize(null);
+      setBodyMeasurements(null);
       setMessage(
         err instanceof TypeError
           ? `Could not reach the ${MODE} prediction API at ${getApiBaseUrl()}. Check that the server is running and reachable from this device, then try again.`
@@ -889,7 +919,8 @@ export default function SizePage() {
 
               {message && (
                 <p
-                  className="mt-4 text-base leading-7 text-[#555]"
+                  role="alert"
+                  className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-base leading-7 text-red-800"
                   style={SANS}
                 >
                   {message}
@@ -1016,6 +1047,15 @@ export default function SizePage() {
                       src={resultImage}
                       alt="Annotated result"
                       className="mt-3 max-h-114 h-auto w-full object-contain"
+                      onError={() => {
+                        setResultImage("");
+                        setMeasurements([]);
+                        setPredictedSize(null);
+                        setBodyMeasurements(null);
+                        setMessage(
+                          "We couldn't display the annotated image. Please try a clear, supported image of one person.",
+                        );
+                      }}
                     />
                   </motion.div>
                 )}
@@ -1025,7 +1065,7 @@ export default function SizePage() {
         </section>
 
         {hasMounted && predictedSize && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Button
               onClick={() => router.push("/health-tips")}
               className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
@@ -1034,6 +1074,18 @@ export default function SizePage() {
               WELLNESS GUIDANCE
               <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.7 }}
+              onClick={() => router.push("/recommendation")}
+              className="flex items-center gap-2 bg-white/90 px-7 py-3 text-xs tracking-[0.2em] text-[#111] backdrop-blur-sm transition-all duration-300 hover:bg-white"
+              style={{ ...SANS, fontWeight: 400 }}
+            >
+              Get Recommendations
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </motion.button>
           </div>
         )}
       </main>
