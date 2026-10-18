@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Camera, ImagePlus } from "lucide-react";
+import { ArrowUpRight, Camera, Focus, ImagePlus } from "lucide-react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -31,6 +31,22 @@ type PoseReadiness = {
   frame_height: number;
 };
 
+const POSE_CHECK_INTERVAL_MS = 1000;
+const POSE_REQUEST_TIMEOUT_MS = 15000;
+const MAX_CAPTURE_DIMENSION = 1280;
+const CAPTURE_JPEG_QUALITY = 0.85;
+type ApiMode = "PC" | "MOBILE";
+const MODE: ApiMode = "PC";
+const getApiBaseUrl = (mode: ApiMode = MODE) => {
+  const mobileApiUrl =
+    process.env.NEXT_PUBLIC_MOBILE_URL?.replace(/\/+$/, "") ||
+    "https://mds3m8h8-8000.asse.devtunnels.ms";
+  const pcApiUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
+    "http://localhost:8000";
+  return mode === "MOBILE" ? mobileApiUrl : pcApiUrl;
+};
+
 export default function SizePage() {
   const router = useRouter();
   const {
@@ -59,6 +75,7 @@ export default function SizePage() {
   const [poseBox, setPoseBox] = useState<[number, number, number, number] | null>(
     null,
   );
+  const [poseCheckVersion, setPoseCheckVersion] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -115,29 +132,38 @@ export default function SizePage() {
     );
   }, [cameraReady, poseBox]);
 
+  // The version token deliberately restarts this polling effect on manual reset.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: used as an explicit polling restart trigger
   useEffect(() => {
     if (!cameraOpen || !cameraReady || mode !== "camera") return;
 
     let cancelled = false;
     let requestInProgress = false;
     let timer: number | undefined;
+    let activeController: AbortController | null = null;
     let consecutiveReadyFrames = 0;
     let consecutiveUnreadyFrames = 0;
     let stableReady = false;
 
-    const scheduleNextFrame = () => {
-      if (!cancelled) timer = window.setTimeout(checkPose, 700);
+    const scheduleNextCheck = () => {
+      if (!cancelled) {
+        timer = window.setTimeout(
+          () => void checkPose(),
+          POSE_CHECK_INTERVAL_MS,
+        );
+      }
     };
 
     const checkPose = async () => {
       if (cancelled || requestInProgress) return;
       const video = videoRef.current;
       if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        scheduleNextFrame();
+        scheduleNextCheck();
         return;
       }
 
       requestInProgress = true;
+      let requestTimeout: number | undefined;
       try {
         const frame = document.createElement("canvas");
         frame.width = video.videoWidth;
@@ -149,13 +175,21 @@ export default function SizePage() {
         const blob = await new Promise<Blob | null>((resolve) =>
           frame.toBlob(resolve, "image/jpeg", 0.72),
         );
+        if (cancelled) return;
         if (!blob) throw new Error("Unable to prepare the live camera frame.");
 
         const formData = new FormData();
         formData.append("file", blob, "live-camera-frame.jpg");
-        const response = await fetch("http://localhost:8000/pose-readiness", { //see if the user is in 2m distance and full body is visible
+        const controller = new AbortController();
+        activeController = controller;
+        requestTimeout = window.setTimeout(
+          () => controller.abort(),
+          POSE_REQUEST_TIMEOUT_MS,
+        );
+        const response = await fetch(`${getApiBaseUrl()}/pose-readiness`, {
           method: "POST",
           body: formData,
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`Live pose check failed (${response.status}).`);
@@ -164,6 +198,10 @@ export default function SizePage() {
         const result = (await response.json()) as PoseReadiness;
         if (cancelled) return;
         setPoseBox(result.box);
+        const statusMessage =
+          result.reason === "low_confidence"
+            ? "Pose detected, but it is not clear enough yet. Face the camera, improve the lighting, and keep your whole body visible. Checking again automatically."
+            : result.message;
 
         if (result.ready) {
           consecutiveReadyFrames += 1;
@@ -172,7 +210,7 @@ export default function SizePage() {
           setPoseReady(stableReady);
           setPoseStatus(
             stableReady
-              ? result.message
+              ? statusMessage
               : "Hold still while we confirm your full-body position.",
           );
         } else {
@@ -192,33 +230,53 @@ export default function SizePage() {
           setPoseStatus(
             stableReady
               ? "Hold this position while the camera confirms your pose."
-              : result.message,
+              : statusMessage,
           );
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          console.error("Live pose check failed:", error);
+          const isAbortError =
+            error instanceof Error && error.name === "AbortError";
+          if (!isAbortError) {
+            console.error("Live pose check failed:", error);
+          }
           consecutiveReadyFrames = 0;
           consecutiveUnreadyFrames += 1;
           if (consecutiveUnreadyFrames >= 2) stableReady = false;
           setPoseReady(stableReady);
           setPoseBox(null);
           setPoseStatus(
-            "Unable to check your live pose. Check that the size-analysis server is running.",
+            isAbortError
+              ? "The pose check timed out. Checking again automatically; please check the size-analysis server if this continues."
+              : error instanceof TypeError
+                ? `Could not reach the ${MODE} backend at ${getApiBaseUrl()}. Check that the backend is running and reachable from this device. On a phone, do not use localhost for a PC backend; use its network address or select MOBILE. Retrying automatically.`
+                : "Unable to check your live pose. Check that the size-analysis server is running. Retrying automatically.",
           );
         }
       } finally {
+        if (requestTimeout !== undefined) {
+          window.clearTimeout(requestTimeout);
+        }
+        activeController = null;
         requestInProgress = false;
-        scheduleNextFrame();
+        scheduleNextCheck();
       }
     };
 
-    checkPose();
+    void checkPose();
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
+      activeController?.abort();
     };
-  }, [cameraOpen, cameraReady, mode]);
+  }, [cameraOpen, cameraReady, mode, poseCheckVersion]);
+
+  const resetPoseCheck = () => {
+    setPoseReady(false);
+    setPoseBox(null);
+    setPoseStatus("Checking your pose...");
+    setPoseCheckVersion((version) => version + 1);
+  };
 
   useEffect(() => {
     return () => {
@@ -336,8 +394,13 @@ export default function SizePage() {
     }
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const scale = Math.min(
+      1,
+      MAX_CAPTURE_DIMENSION / video.videoWidth,
+      MAX_CAPTURE_DIMENSION / video.videoHeight,
+    );
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
     const context = canvas.getContext("2d");
     if (!context) {
       setMessage("Unable to capture an image from the camera.");
@@ -356,7 +419,7 @@ export default function SizePage() {
       handleFile(capturedPhoto);
       stopCamera();
       void handlePredict(capturedPhoto);
-    }, "image/jpeg", 0.92);
+    }, "image/jpeg", CAPTURE_JPEG_QUALITY);
   };
 
   useEffect(() => {
@@ -399,9 +462,13 @@ export default function SizePage() {
 
     setLoading(true);
     setMessage("");
+    setResultImage("");
+    setMeasurements([]);
+    setPredictedSize(null);
+    setBodyMeasurements(null);
 
     try {
-      const res = await fetch("http://localhost:8000/predict", { //size prediction API
+      const res = await fetch(`${getApiBaseUrl()}/predict`, {
         method: "POST",
         body: formData,
       });
@@ -422,14 +489,40 @@ export default function SizePage() {
         annotated_image?: string;
         measurements?: Measurement[];
       };
-      const predictionMeasurements = data.measurements ?? [];
-      const firstMeasurement = predictionMeasurements[0];
+      const annotatedImage =
+        typeof data.annotated_image === "string" &&
+        data.annotated_image.startsWith("data:image/")
+          ? data.annotated_image
+          : "";
+      if (!annotatedImage) {
+        throw new Error(
+          "We couldn't annotate this image. Please try a clear, supported image of one person.",
+        );
+      }
 
-      setResultImage(data.annotated_image ?? "");
-      setMeasurements(predictionMeasurements);
-      setPredictedSize(firstMeasurement?.size ?? null);
+      const predictionMeasurements = Array.isArray(data.measurements)
+        ? data.measurements
+        : [];
+      if (predictionMeasurements.length === 0) {
+        throw new Error(
+          "No person or full-body pose was detected. Upload a clear photo of one person with their whole body in frame.",
+        );
+      }
+
+      const firstMeasurement = predictionMeasurements[0];
       if (
-        firstMeasurement?.size &&
+        typeof firstMeasurement?.size !== "string" ||
+        !firstMeasurement.size.trim()
+      ) {
+        throw new Error(
+          "We couldn't predict a clothing size from this image. Try a clear, full-body photo of one person.",
+        );
+      }
+
+      setResultImage(annotatedImage);
+      setMeasurements(predictionMeasurements);
+      setPredictedSize(firstMeasurement.size);
+      if (
         typeof firstMeasurement.height_cm === "number" &&
         Number.isFinite(firstMeasurement.height_cm) &&
         typeof firstMeasurement.shoulder_cm === "number" &&
@@ -447,16 +540,18 @@ export default function SizePage() {
       } else {
         setBodyMeasurements(null);
       }
-
-      if (predictionMeasurements.length === 0) {
-        setMessage("No full-body pose was detected. Try a clear image with your full body in frame.");
-      }
     } catch (err) {
       console.error(err);
+      setResultImage("");
+      setMeasurements([]);
+      setPredictedSize(null);
+      setBodyMeasurements(null);
       setMessage(
-        err instanceof Error
-          ? err.message
-          : "Prediction failed. Please try again.",
+        err instanceof TypeError
+          ? `Could not reach the ${MODE} prediction API at ${getApiBaseUrl()}. Check that the server is running and reachable from this device, then try again.`
+          : err instanceof Error
+            ? err.message
+            : "Prediction failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -658,7 +753,7 @@ export default function SizePage() {
               {mode === "camera" ? (
                 <div className="mt-4">
                   <p
-                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg"
+                    className="mb-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-sm leading-6 text-[#666] sm:text-sm"
                   >
                     Please move back until you are approximately{" "}
                     <strong className="font-semibold text-[#111]">
@@ -683,6 +778,16 @@ export default function SizePage() {
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                         />
+                        <button
+                          type="button"
+                          onClick={resetPoseCheck}
+                          disabled={!cameraReady}
+                          aria-label="Reset pose check"
+                          title="Reset pose check"
+                          className="absolute right-3 top-3 z-10 rounded-md border border-white/30 bg-black/60 p-2 text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Focus className="h-5 w-5" />
+                        </button>
                       </div>
                       <p
                         role="status"
@@ -763,7 +868,7 @@ export default function SizePage() {
                     placeholder="e.g. 170"
                     className="mt-2 w-full border border-[#d7d7d7] bg-white px-3 py-2.5 text-base text-[#111] outline-none focus:border-[#111]"
                   />
-                  <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-base leading-7 text-[#666] sm:text-lg">
+                  <p className="mt-3 border border-[#f0e3a2] bg-[#fff9df] px-4 py-3 font-sans text-sm leading-6 text-[#666]">
                     Take the photo from about 2 metres away. Height is used only
                     to scale the pixel measurements into centimeters; it does
                     not change the pixel-based size prediction. If left blank,
@@ -814,7 +919,8 @@ export default function SizePage() {
 
               {message && (
                 <p
-                  className="mt-4 text-base leading-7 text-[#555]"
+                  role="alert"
+                  className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-base leading-7 text-red-800"
                   style={SANS}
                 >
                   {message}
@@ -941,6 +1047,15 @@ export default function SizePage() {
                       src={resultImage}
                       alt="Annotated result"
                       className="mt-3 max-h-114 h-auto w-full object-contain"
+                      onError={() => {
+                        setResultImage("");
+                        setMeasurements([]);
+                        setPredictedSize(null);
+                        setBodyMeasurements(null);
+                        setMessage(
+                          "We couldn't display the annotated image. Please try a clear, supported image of one person.",
+                        );
+                      }}
                     />
                   </motion.div>
                 )}
@@ -950,13 +1065,21 @@ export default function SizePage() {
         </section>
 
         {hasMounted && predictedSize && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Button
               onClick={() => router.push("/health-tips")}
               className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
               style={{ ...SANS, fontWeight: 400 }}
             >
-              WELLNESS GUIDANCE
+              Wellness Guide
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              onClick={() => router.push("/recommendation")}
+              className="h-auto flex items-center gap-2 rounded-none bg-[#111] px-4 py-3 text-sm tracking-[0.12em] text-white transition-colors hover:bg-[#333]"
+              style={{ ...SANS, fontWeight: 400 }}
+            >
+              Get Recommendation
               <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
           </div>
