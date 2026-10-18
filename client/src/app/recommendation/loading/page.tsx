@@ -112,7 +112,10 @@ export default function RecommendationLoadingPage() {
 
         if (cancelled) return;
 
-        setProductResults(result.recommendations);
+        setProductResults([
+          ...result.recommendations,
+          ...(result.alternatives ?? []),
+        ]);
         setResultOccasionUsed(result.occasion_used ?? null);
         setStepIndex(PROCESSING_STEPS.length - 1);
         setProgress(100);

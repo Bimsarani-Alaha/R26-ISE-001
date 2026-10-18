@@ -24,6 +24,9 @@ export default function RecommendationResultsPage() {
   const matchingProducts = productResults.filter(
     (item) => item.match_category === "exact",
   );
+  const alternativeProducts = productResults.filter(
+    (item) => item.match_category === "alternative",
+  );
   const groups = buildRecommendationGroups(productResults, resultOccasionUsed);
 
   const toggleLike = (id: string) => {
@@ -49,7 +52,7 @@ export default function RecommendationResultsPage() {
     );
   }
 
-  if (matchingProducts.length === 0) {
+  if (groups.length === 0) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -125,11 +128,17 @@ export default function RecommendationResultsPage() {
 
           <p className="text-[10px] tracking-[0.2em] text-[#bbb]" style={SANS}>
             {gender.toUpperCase()} · SIZE {size.toUpperCase()} ·{" "}
-            {matchingProducts.length} RESULTS
+            {matchingProducts.length} EXACT MATCHES · {alternativeProducts.length} ALTERNATIVES
           </p>
         </motion.div>
 
-        {!resultOccasionUsed?.length && (
+        {matchingProducts.length === 0 && (
+          <p className="text-sm text-[#555] mb-8" style={SANS}>
+            No products match all your requirements. Explore similar alternatives
+            below, with differences shown on each item.
+          </p>
+        )}
+        {!resultOccasionUsed?.length && matchingProducts.length > 0 && (
           <p className="text-sm text-[#555] mb-8" style={SANS}>
             No occasion specified. Matches are grouped by their catalogue occasions.
           </p>
@@ -141,6 +150,12 @@ export default function RecommendationResultsPage() {
                 <h2 className="text-2xl text-[#111] mb-4" style={SERIF}>
                   {title}
                 </h2>
+                {title === "Similar Alternatives" && (
+                  <p className="text-sm text-[#555] mb-6" style={SANS}>
+                    These items do not match every requirement. Check the
+                    differences and unverified details listed on each item.
+                  </p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {items.map((item, i) => (
                     <motion.div

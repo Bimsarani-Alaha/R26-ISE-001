@@ -225,6 +225,13 @@ __marimo__/
 .streamlit/secrets.toml
 
 **/__pycache__
+.pytest-tmp-*/
+.pytest-package-wheel/
+AI Style Recommendation Model/results/
+AI Style Recommendation Model/artifacts/**/*.safetensors
+AI Style Recommendation Model/artifacts/**/*.bin
+AI Style Recommendation Model/artifacts/**/*.onnx
+AI Style Recommendation Model/artifacts/**/*.onnx_data
 *.py[cod]
 *.pyo
 *~

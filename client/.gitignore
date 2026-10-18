@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Keep the recommendation grouping source despite the root Python lib/ rule.
+!src/app/lib/
+src/app/lib/*
+!src/app/lib/recommendationGroups.ts
