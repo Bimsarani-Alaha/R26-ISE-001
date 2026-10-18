@@ -2,14 +2,15 @@
 
 import { ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { SiteNav } from "@/app/components/SiteNav";
 import { SANS, SERIF } from "@/app/components/typography";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Textarea } from "@/app/components/ui/textarea";
 import { useAppStore } from "@/app/context/AppStoreContext";
+import { getRecommendationPrefill } from "@/app/lib/recommendationPrefill";
 
 const GENDERS = ["Male", "Female", "Unisex"];
 const SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
@@ -32,127 +33,25 @@ export default function RecommendationPage() {
 
 function RecommendationForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const fromSize = searchParams.get("from") === "size";
   const store = useAppStore();
-  const [gender, setGender] = useState(store.gender || "");
-  const [size, setSize] = useState(store.size || "");
+  const [gender, setGender] = useState("");
+  const [size, setSize] = useState("");
+  const initialized = useRef(false);
   const [requirements, setRequirements] = useState("");
   const [charCount, setCharCount] = useState(0);
 
-  // Pre-select from size prediction (localStorage via AppStoreContext)
-  const mapPredictedGender = (g: string) => {
-    const v = g.trim().toLowerCase();
-    if (v === "men" || v === "male") return "Male";
-    if (v === "women" || v === "female") return "Female";
-    if (v === "unisex") return "Unisex";
-    return g;
-  };
+  // AppStore hydrates styleai-gender and styleai-predicted-size after mount.
+  const prefill = getRecommendationPrefill(store);
 
   useEffect(() => {
-    if (!store.hydrated) return;
-    // styleai-gender uses Women/Men, recommendation uses Male/Female/Unisex — map it
-    // Also handles direct localStorage edits (with or without JSON.stringify)
-    const readRawGender = (): string | null => {
-      try {
-        const raw = window.localStorage.getItem("styleai-gender");
-        if (!raw) return null;
-        try {
-          const parsed = JSON.parse(raw);
-          return typeof parsed === "string" ? parsed : raw;
-        } catch {
-          return raw.replace(/^"|"$/g, "");
-        }
-      } catch {
-        return null;
-      }
-    };
-    const readRawSize = (): string | null => {
-      try {
-        const raw = window.localStorage.getItem("styleai-size");
-        if (!raw) return null;
-        try {
-          const parsed = JSON.parse(raw);
-          return typeof parsed === "string" ? parsed : raw;
-        } catch {
-          return raw.replace(/^"|"$/g, "");
-        }
-      } catch {
-        return null;
-      }
-    };
-    const readRawBodyMeasurements = (): { gender?: string; clothingSize?: string } | null => {
-      try {
-        const raw = window.localStorage.getItem("styleai-body-measurements");
-        if (!raw) return null;
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    };
-    // /size → Fashion Recommendation (?from=size) auto-fills from bodyMeasurements; homepage flow stays free
-    if (!gender && fromSize) {
-      if (store.bodyMeasurements?.gender) {
-        const mapped = mapPredictedGender(store.bodyMeasurements.gender);
-        if (GENDERS.includes(mapped)) {
-          setGender(mapped);
-          const mappedStore = store.gender ? mapPredictedGender(store.gender) : null;
-          if (mappedStore !== mapped) store.setGender(mapped);
-        }
-      } else {
-        const rawBody = readRawBodyMeasurements();
-        if (rawBody?.gender) {
-          const mapped = mapPredictedGender(rawBody.gender);
-          if (GENDERS.includes(mapped)) {
-            setGender(mapped);
-            const mappedStore = store.gender ? mapPredictedGender(store.gender) : null;
-            if (mappedStore !== mapped) store.setGender(mapped);
-          }
-        } else if (store.gender) {
-          const mappedStoreGender = mapPredictedGender(store.gender);
-          if (GENDERS.includes(mappedStoreGender)) setGender(mappedStoreGender);
-          else if (GENDERS.includes(store.gender)) setGender(store.gender);
-        } else {
-          const rawGender = readRawGender();
-          if (rawGender) {
-            const mapped = mapPredictedGender(rawGender);
-            if (GENDERS.includes(mapped)) setGender(mapped);
-          }
-        }
-      }
-    }
-    if (!size && fromSize) {
-      if (store.bodyMeasurements?.clothingSize) {
-        const predictedSize = store.bodyMeasurements.clothingSize.trim().toUpperCase();
-        if (SIZES.includes(predictedSize)) {
-          setSize(predictedSize);
-          if (store.size !== predictedSize) store.setSize(predictedSize);
-        }
-      } else {
-        const rawBody = readRawBodyMeasurements();
-        if (rawBody?.clothingSize) {
-          const predictedSize = rawBody.clothingSize.trim().toUpperCase();
-          if (SIZES.includes(predictedSize)) {
-            setSize(predictedSize);
-            if (store.size !== predictedSize) store.setSize(predictedSize);
-          }
-        } else if (store.size) {
-          const normalizedSize = store.size.trim().toUpperCase();
-          if (SIZES.includes(normalizedSize)) setSize(normalizedSize);
-        } else {
-          const rawSize = readRawSize();
-          if (rawSize && SIZES.includes(rawSize.trim().toUpperCase())) {
-            setSize(rawSize.trim().toUpperCase());
-          }
-        }
-      }
-    }
-  }, [store.hydrated, store.bodyMeasurements, store.gender, store.size, gender, size, fromSize]);
+    if (!store.hydrated || initialized.current) return;
+    initialized.current = true;
+    setGender(prefill.gender);
+    setSize(prefill.size);
+  }, [store.hydrated, prefill.gender, prefill.size]);
 
-  const predictedGender = fromSize && store.bodyMeasurements?.gender ? mapPredictedGender(store.bodyMeasurements.gender) : null;
-  const predictedSize = fromSize && store.bodyMeasurements?.clothingSize?.trim().toUpperCase() ? store.bodyMeasurements.clothingSize.trim().toUpperCase() : null;
-  const genderFromPrediction = fromSize && !!predictedGender && gender === predictedGender;
-  const sizeFromPrediction = fromSize && !!predictedSize && size === predictedSize;
+  const genderFromPrediction = !!prefill.predictedGender && gender === prefill.predictedGender;
+  const sizeFromPrediction = !!prefill.predictedSize && size === prefill.predictedSize;
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setRequirements(e.target.value);
@@ -182,6 +81,7 @@ function RecommendationForm() {
     <Button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       variant="outline"
       size="sm"
       className={`px-4 py-2 text-xs tracking-[0.12em] transition-all duration-200 border rounded-none h-auto ${

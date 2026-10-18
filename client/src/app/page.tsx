@@ -5,9 +5,27 @@ import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { SANS, SERIF, StyleAiWordmark } from "@/app/components/typography";
 import { Button } from "@/app/components/ui/button";
+import { useAppStore } from "@/app/context/AppStoreContext";
 
 export default function HomePage() {
   const router = useRouter();
+  const store = useAppStore();
+
+  const handleGetRecommendations = () => {
+    store.setGender("");
+    store.setSize("");
+    store.setPredictedSize(null);
+    store.setBodyMeasurements(null);
+    store.setRequirements("");
+    store.setOccasion("");
+    store.setColorPreference("");
+    store.setPrediction(null);
+    store.setRecommendations([]);
+    store.setProductResults([]);
+    store.setResultOccasionUsed(null);
+    store.setStylistTipsCache({});
+    router.push("/recommendation");
+  };
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
@@ -99,7 +117,8 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.7 }}
-                onClick={() => router.push("/recommendation")}
+                onClick={handleGetRecommendations}
+                disabled={!store.hydrated}
                 className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-[#111] px-7 py-3 text-xs tracking-[0.2em] hover:bg-white transition-all duration-300"
                 style={{ ...SANS, fontWeight: 400 }}
               >
@@ -244,7 +263,8 @@ export default function HomePage() {
           className="flex justify-center mt-10"
         >
           <Button
-            onClick={() => router.push("/recommendation")}
+            onClick={handleGetRecommendations}
+            disabled={!store.hydrated}
             variant="outline"
             className="flex items-center gap-2 border border-[#111] text-[#111] px-8 py-3 text-xs tracking-[0.2em] rounded-none h-auto bg-transparent hover:bg-[#111] hover:text-white transition-all duration-300"
             style={{ ...SANS, fontWeight: 400 }}
